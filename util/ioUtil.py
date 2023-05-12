@@ -15,10 +15,12 @@ from PIL import Image
 from facenet_pytorch import MTCNN
 
 from util import AudioFileModel
+from util import VideoFileModel
 
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
 crema_d_dir = os.path.join(parent_dir, 'CREMA-D')
 audio_wav_dir = os.path.join(crema_d_dir, 'AudioWAV')
+
 labels = {
     'ANGER': 0,
     'DISGUST': 1,
@@ -39,16 +41,17 @@ get_labels = {
 config = json.load(open('config.json'))
 
 
-def get_wav_files(limit=4000):
+def get_audio_video_files(limit=4000):
     wav_files = os.listdir(audio_wav_dir)
+    video_files = os.listdir(config['video_dir_path'])
     audio_files_list = list()
+    video_files_list = list()
     for file in wav_files[:limit]:
         actor, sample, emotion, emotion_level = file.split('_')
         emotion = get_emotion_by_notation(emotion)
         emotion_level = get_emotion_level_by_notation(emotion_level)
         wav_file_path = join(audio_wav_dir, file)
         metadata = torchaudio.info(wav_file_path)
-        # _, waveform_data = wavfile.read(wav_file_path)
         waveform_data, sample_rate = torchaudio.load(wav_file_path)
         audio_file = AudioFileModel.AudioFile(sample=sample, actor=actor, emotion=emotion,
                                               emotion_level=emotion_level, metadata=metadata,
@@ -56,7 +59,18 @@ def get_wav_files(limit=4000):
         if audio_file.get_length_in_seconds() < 3:
             audio_files_list.append(audio_file)
 
-    return audio_files_list
+    for file in video_files[:limit]:
+        actor, sample, emotion, emotion_level = file.split('_')
+        emotion = get_emotion_by_notation(emotion)
+        emotion_level = get_emotion_level_by_notation(emotion_level)
+        video_file_path = join(audio_wav_dir, file)
+        video_capture = cv2.VideoCapture(video_file_path)
+        video_file = VideoFileModel.VideoFile(sample=sample, actor=actor, emotion=emotion,
+                                              emotion_level=emotion_level, video_data=video_capture)
+        if video_file.get_length_in_seconds() < 3:
+            video_files_list.append(video_file)
+
+    return audio_files_list, video_files_list
 
 
 def plot_waveform(waveform, sample_rate, title="Waveform", xlim=None, ylim=None):
@@ -250,7 +264,7 @@ def get_metadata_from_file_name(file_name):
 
 
 def save_spectrograms_to_dir(spectrograms_count=500, dir_name='Spectrograms'):
-    for file in get_wav_files(spectrograms_count):
+    for file in get_audio_video_files(spectrograms_count):
         save_dir = os.path.join(parent_dir, dir_name)
         file_name = f"{file.actor}_{file.sample}_{file.emotion}_{file.emotion_level}"
         print(f'Saving {file_name}...')
@@ -294,6 +308,7 @@ def write_video_frames_as_npy():
         video_file = os.path.join(video_dir_path, file)
         video_capture = cv2.VideoCapture(video_file)
         total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
+
         step = total_frames // 10
 
         start = int(total_frames * 0.07)

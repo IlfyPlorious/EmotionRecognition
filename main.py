@@ -5,6 +5,7 @@ import sys
 from threading import Thread
 from time import sleep
 
+import cv2
 import numpy as np
 import torch
 from torch import nn
@@ -41,19 +42,6 @@ def run_training():
 
 # run_training()
 
-# minimum = 1000
-# files = iou.get_wav_files(limit=7000)
-# for file in files:
-#     print('\n\n')
-#     print('checking file ', file.get_file_name())
-#     spec = torch.tensor(iou.get_spectrogram_from_waveform_in_db(file.waveform_data))
-#     print('Spec timespan ', spec.shape[2])
-#     print('Current minimum ', minimum)
-#     if spec.shape[2] < minimum:
-#         minimum = spec.shape[2]
-#
-# print(minimum)
-
 
 def test_model_for_windows():
     dataset = data_manager_spectrogram.DataManagerSpectrograms(config).get_dataset_no_loader()
@@ -64,37 +52,39 @@ def test_model_for_windows():
         map_location=config['device'])
     model.load_state_dict(checkpoint['model_weights'])
 
-    # enumerate ads a counter for each element in for loop ( like an i index )
-    # this index corresponds to the batch being processed
-    # enumerate returns ( index, obj ), and here object is ( spectrogram, label )
-
     for (spec, label) in dataset:
         spec = spec.cuda()
         label = label.cuda()
 
-        windows = iou.spectrogram_windowing(spec, window_size=120, window_count=3).cuda()
+        windows = iou.spectrogram_windowing(spec, window_size=120, window_count=5).cuda()
 
-        predictions = model(windows)
+        predictions, terminal_layers = model(windows)
 
         predictions = predictions.detach().cpu().numpy()
         entropies = iou.compute_entropy(predictions)
-        # predictions = torch.empty((3, ))
 
 
-        # if self.config['windowing']:
-        #     for i in range(0, len(spectrogram_batch)):
-        #         windows = iou.spectrogram_windowing(spectrogram_batch[i]).cuda()
-        #         emotion_label = emotion_prediction_batch[i]
-        #         window_predictions = self.model(windows)
-        #         correct_label_index = torch.argmax(emotion_label)
-        #         correct_pred_column = window_predictions[:, correct_label_index.item()]
-        #         best_window = torch.argmax(correct_pred_column)
-        #         best_window_batch.append(best_window.item())
-        #         best_window_predictions.append(window_predictions[best_window.item()])
-        #
-        #         self.log_file.write(
-        #             f'\n\nBest window for {iou.get_labels[correct_label_index.item()]} is window {best_window.item()}/5'
-        #             f'\nwith prediction: {window_predictions[best_window.item()]}\n')
+# test_model_for_windows()
 
 
-test_model_for_windows()
+# video_dir_path = config['video_dir_path']
+#
+# file = os.listdir(video_dir_path)[10]
+# print(file)
+# video_file = os.path.join(video_dir_path, file)
+
+# read specific frame
+# video_capture = cv2.VideoCapture(video_file)
+# frame_number = 24
+# video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)
+# res, frame = video_capture.read()
+
+
+# TODO steps
+# video enters
+# split data in video and audio
+# preprocess audio data
+# send spectrogram to spec model
+# preprocess video data
+# use spec model terminal layer and video data ( currently 1 image ) to feed pretrained model
+# see the results
