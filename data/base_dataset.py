@@ -14,7 +14,7 @@ from util import ioUtil as iou
 
 class SpectrogramsDataset(Dataset):
     def __init__(self, actor_dirs, window_count=3, window_size=120, no_windowing=False, transform=None,
-                 transform_target=None, config=None):
+                 transform_target=None, config=None, return_names=False):
         self.transform = transform
         self.target_transform = transform_target
         self.actor_dirs = actor_dirs
@@ -22,6 +22,7 @@ class SpectrogramsDataset(Dataset):
         self.window_size = window_size
         self.no_windowing = no_windowing
         self.config = config
+        self.return_names = return_names
 
     def __len__(self):
         length = 0
@@ -61,7 +62,10 @@ class SpectrogramsDataset(Dataset):
             label = self.target_transform(label)
 
         if self.no_windowing:
-            return spec, label
+            if self.return_names:
+                return spec, label, spec_path
+            else:
+                return spec, label
 
         if self.config['random_windowing']:
             windows = iou.random_spectrogram_windowing(spec, window_size=self.window_size,

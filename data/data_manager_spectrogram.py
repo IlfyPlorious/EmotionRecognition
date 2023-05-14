@@ -62,7 +62,7 @@ valid_split -> division part for validation size = dataset // valid_split
     def get_dataset_no_loader(self):
         dataset = SpectrogramsDataset(actor_dirs=self.actor_dirs, no_windowing=True,
                                       transform=self.transform,
-                                      transform_target=self.transform_target, config=self.config)
+                                      transform_target=self.transform_target, config=self.config, return_names=True)
 
         return dataset
 

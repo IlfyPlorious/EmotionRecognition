@@ -230,6 +230,17 @@ def get_emotion_level_by_notation(notation):
         return "UNSPECIFIED"
 
 
+def get_notation_by_emotion_level(emotion_level):
+    if emotion_level == 'LOW':
+        return "LO"
+    elif emotion_level == 'MEDIUM':
+        return "MD"
+    elif emotion_level == 'HIGH':
+        return "HI"
+    else:
+        return "XX"
+
+
 def get_emotion_by_notation(notation):
     if notation == 'ANG':
         return "ANGER"
@@ -243,6 +254,21 @@ def get_emotion_by_notation(notation):
         return "SAD"
     else:
         return "NEUTRAL"
+
+
+def get_notation_by_emotion(emotion):
+    if emotion == 'ANGER':
+        return "ANG"
+    elif emotion == 'DISGUST':
+        return "DIS"
+    elif emotion == 'FEAR':
+        return "FEA"
+    elif emotion == 'HAPPY':
+        return "HAP"
+    elif emotion == 'SAD':
+        return "SAD"
+    else:
+        return "NEU"
 
 
 def get_metadata_from_file_name(file_name):
@@ -351,6 +377,7 @@ def get_face_cropped_image(img):
 def spectrogram_windowing(spectrogram, window_size=70, window_count=5, plot=False):
     channels, frequencies, timespan = spectrogram.shape
     windows = torch.empty((window_count, channels, frequencies, window_size))
+    windows_indexes = list()
 
     if window_count == 1:
         return [spectrogram[:, :, :window_size]]
@@ -361,7 +388,10 @@ def spectrogram_windowing(spectrogram, window_size=70, window_count=5, plot=Fals
         windows[i] = spectrogram[:, :,
                      i * (window_size - window_overlap): i * (window_size - window_overlap) + window_size]
 
+        windows_indexes.append((i * (window_size - window_overlap), i * (window_size - window_overlap) + window_size))
+
     windows[window_count - 1] = spectrogram[:, :, timespan - window_size:]
+    windows_indexes.append((timespan - window_size, spectrogram.shape[2]))
 
     if plot:
         plt.figure(), plt.subplot(window_count + 1, 1, 1), plt.imshow(torch.permute(spectrogram, (1, 2, 0)))
@@ -370,7 +400,7 @@ def spectrogram_windowing(spectrogram, window_size=70, window_count=5, plot=Fals
 
         plt.show()
 
-    return windows
+    return windows, windows_indexes
 
 
 def random_spectrogram_windowing(spectrogram, window_size=70, window_count=5, plot=False):
@@ -390,6 +420,27 @@ def random_spectrogram_windowing(spectrogram, window_size=70, window_count=5, pl
         plt.show()
 
     return windows
+
+
+def get_frame_from_video(video_path, start_index, end_index, spectrogram_length, plot=False):
+    video_path = video_path.split('_')
+    video_path[2] = get_notation_by_emotion(video_path[2])
+    video_path[3] = get_notation_by_emotion_level(video_path[3].split('.')[0]) + '.flv'
+    video_path = '_'.join(video_path)
+    video_capture = cv2.VideoCapture(video_path)
+    total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
+
+    start_index_frames = total_frames * start_index // spectrogram_length
+    end_index_frames = total_frames * end_index // spectrogram_length
+
+    frame_number = np.random.randint(low=start_index_frames, high=end_index_frames)
+    video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)
+    res, frame = video_capture.read()
+    video_capture.release()
+
+    if plot:
+        plt.figure(), plt.imshow(frame), plt.show()
+    return frame
 
 
 def compute_entropy(probabilities):
