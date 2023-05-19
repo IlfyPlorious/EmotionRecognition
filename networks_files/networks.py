@@ -197,10 +197,10 @@ class ResNet(nn.Module):
 
         x = self.layer4(x)
 
-        terminal_layer = torch.tensor(x)
-
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
+        terminal_layer = x.clone()
+
         x = self.fc(x)
         x = self.softmax(x)
 

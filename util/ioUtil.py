@@ -422,13 +422,39 @@ def random_spectrogram_windowing(spectrogram, window_size=70, window_count=5, pl
     return windows
 
 
+def try_to_gat_valid_video_capture(path, intensity='XX'):
+    video_capture = cv2.VideoCapture(path)
+    total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
+
+    if total_frames == 0:
+        video_capture.release()
+        video_path_split = path.split('_')
+        video_path_split[-1] = f'{intensity}.flv'
+
+        new_path = '_'.join(video_path_split)
+
+        video_capture = cv2.VideoCapture(new_path)
+        total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
+
+    return video_capture, total_frames
+
+
 def get_frame_from_video(video_path, start_index, end_index, spectrogram_length, plot=False):
     video_path = video_path.split('_')
     video_path[2] = get_notation_by_emotion(video_path[2])
     video_path[3] = get_notation_by_emotion_level(video_path[3].split('.')[0]) + '.flv'
     video_path = '_'.join(video_path)
-    video_capture = cv2.VideoCapture(video_path)
-    total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
+    video_capture, total_frames = try_to_gat_valid_video_capture(video_path)
+
+    if total_frames == 0:
+        video_capture.release()
+        video_capture, total_frames = try_to_gat_valid_video_capture(video_path, intensity='LO')
+        if total_frames == 0:
+            video_capture.release()
+            video_capture, total_frames = try_to_gat_valid_video_capture(video_path, intensity='MD')
+            if total_frames == 0:
+                video_capture.release()
+                video_capture, total_frames = try_to_gat_valid_video_capture(video_path, intensity='HI')
 
     start_index_frames = total_frames * start_index // spectrogram_length
     end_index_frames = total_frames * end_index // spectrogram_length
@@ -440,7 +466,7 @@ def get_frame_from_video(video_path, start_index, end_index, spectrogram_length,
 
     if plot:
         plt.figure(), plt.imshow(frame), plt.show()
-    return frame
+    return np.transpose(frame, (2, 0, 1))
 
 
 def compute_entropy(probabilities):

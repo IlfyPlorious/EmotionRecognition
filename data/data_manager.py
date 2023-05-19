@@ -2,32 +2,22 @@ import os
 
 import numpy as np
 import torch
+from torch import load
+from torch import nn
+from torchvision import models
 from torchvision.transforms import Lambda
 
-from data.base_dataset import SpectrogramsDataset
+from data.audio_video_dataset import AudioVideoDataset
+from networks_files.networks import ResNet
+from networks_files.res_net import BasicBlock
 from util import ioUtil
 
 
-class DataManagerSpectrograms:
-    """Manager class for data loaders.
-
-Config argument is a dictionary that contains the following:
-
-spectrogram_dir -> path_to_spectograms_dir
-
-video_data -> path_to_frames_dir
-
-batch_size -> size of the batch
-
-train_epochs -> epochs count
-
-device -> cuda if gpu else cpu
-
-train_split -> division part for train size = dataset // train_split
-
-valid_split -> division part for validation size = dataset // valid_split
-
-"""
+class DataManager:
+    '''
+    Final datamanager using spectrogram model and pretrained model to transform dataset
+    in order to obtain final avgpool layers to be concatenated
+    '''
 
     def __init__(self, config):
         self.config = config
@@ -46,25 +36,50 @@ valid_split -> division part for validation size = dataset // valid_split
             self.actor_dirs.append(os.path.join(self.config['spectrogram_dir'], actor))
             self.actor_dirs_count += 1
 
-    def get_dataloader_spectrograms(self):
-        dataset = SpectrogramsDataset(window_count=3, window_size=120, actor_dirs=self.actor_dirs,
-                                      transform=self.transform,
-                                      transform_target=self.transform_target, config=self.config)
+        self.vid_model = self.initialize_pretrained_video_model()
+        self.spec_model = self.initialize_spectrogram_model()
+
+    def initialize_spectrogram_model(self, device='cuda'):
+        model = ResNet(block=BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
+
+        checkpoint = load(
+            os.path.join(self.config['exp_path'], self.config['exp_name_spec'], 'latest_checkpoint.pkl'),
+            map_location=self.config['device'])
+        model.load_state_dict(checkpoint['model_weights'])
+
+        return model
+
+    def initialize_pretrained_video_model(self, num_classes=6, feature_extract=True, use_pretrained=True,
+                                          device='cuda'):
+        # Initialize these variables which will be set in this if statement. Each of these
+        #   variables is model specific.
+
+        model = models.resnet50(pretrained=use_pretrained).to(device)
+        self.set_parameter_requires_grad(model, feature_extract)
+        num_features = model.fc.in_features
+        model.fc = nn.Linear(num_features, num_classes)
+
+        return model
+
+    @staticmethod
+    def set_parameter_requires_grad(model, feature_extracting=True):
+        if feature_extracting:
+            for param in model.parameters():
+                param.requires_grad = False
+
+    def get_dataloader(self):
+        dataset = AudioVideoDataset(window_count=3, window_size=120, actor_dirs=self.actor_dirs,
+                                    transform=self.transform,
+                                    transform_target=self.transform_target, config=self.config,
+                                    spec_model=self.spec_model, vid_model=self.vid_model)
 
         dataloader = torch.utils.data.DataLoader(
             dataset,
             batch_size=self.config['batch_size'],
             shuffle=True,
-            pin_memory=True if self.config['device'] == 'cuda' else False
+            pin_memory=False
         )
         return dataloader
-
-    def get_dataset_no_loader(self):
-        dataset = SpectrogramsDataset(actor_dirs=self.actor_dirs, no_windowing=True,
-                                      transform=self.transform,
-                                      transform_target=self.transform_target, config=self.config, return_names=True)
-
-        return dataset
 
     def get_train_eval_dataloaders_spectrograms(self):
         np.random.seed(707)
@@ -85,14 +100,16 @@ valid_split -> division part for validation size = dataset // valid_split
         np.random.shuffle(train_dirs)
         np.random.shuffle(eval_dirs)
 
-        train_dataset = SpectrogramsDataset(window_count=3, window_size=120, actor_dirs=train_dirs,
-                                            transform=self.transform,
-                                            transform_target=self.transform_target, config=self.config)
+        train_dataset = AudioVideoDataset(window_count=3, window_size=120, actor_dirs=train_dirs,
+                                          transform=self.transform,
+                                          transform_target=self.transform_target, config=self.config,
+                                          spec_model=self.spec_model, vid_model=self.vid_model)
         train_dataset_size = len(train_dataset)
 
-        eval_dataset = SpectrogramsDataset(window_count=3, window_size=120, actor_dirs=eval_dirs,
-                                           transform=self.transform,
-                                           transform_target=self.transform_target, config=self.config)
+        eval_dataset = AudioVideoDataset(window_count=3, window_size=120, actor_dirs=eval_dirs,
+                                         transform=self.transform,
+                                         transform_target=self.transform_target, config=self.config,
+                                         spec_model=self.spec_model, vid_model=self.vid_model)
         eval_dataset_size = len(eval_dataset)
 
         ## INDICES SHUFFLE ##
