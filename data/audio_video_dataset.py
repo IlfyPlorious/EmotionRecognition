@@ -68,8 +68,6 @@ class AudioVideoDataset(Dataset):
         video_path = os.path.join(videos_dir, file_name)
 
         start, end = windows_indexes[best_window_index]
-        if end == 0:
-            pass
 
         frame = get_frame_from_video(video_path=video_path, start_index=start, end_index=end,
                                      spectrogram_length=spec.shape[2])
@@ -90,4 +88,4 @@ class AudioVideoDataset(Dataset):
 
         features = torch.cat((spec_terminal_layer, video_terminal_layer))
 
-        return features, label
+        return features, label, file_name

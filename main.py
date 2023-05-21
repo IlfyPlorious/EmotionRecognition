@@ -11,7 +11,9 @@ from torch import optim
 from torchvision import models
 import cv2
 
+from brain_trainer import BrainTrainer
 from data.data_manager import DataManager
+from networks_files.brain import Brain
 from networks_files.hook import Hook
 
 import trainer as tr
@@ -206,4 +208,56 @@ def test_model_for_windows():
 # see the output
 
 
-dataloader = DataManager(config).get_dataloader()
+def run_brain_training():
+    model = Brain().to(device)
+    train_dataloader, eval_dataloader = DataManager(config=config).get_train_eval_dataloaders_spectrograms()
+    optimizer = optim.SGD(model.parameters(), lr=config['learning_rate'])
+    scheduler = optim.lr_scheduler.LinearLR(optimizer=optimizer, total_iters=7)
+
+    trainer = BrainTrainer(model=model, train_dataloader=train_dataloader,
+                           eval_dataloader=eval_dataloader,
+                           loss_fn=nn.CrossEntropyLoss(), criterion=None, optimizer=optimizer,
+                           scheduler=scheduler,
+                           config=config)
+
+    trainer.run()
+
+
+from util.ioUtil import map_tensor_to_0_1
+
+from networks_files.networks import ResNet
+from networks_files.res_net import BasicBlock
+
+
+def initialize_spectrogram_model(device='cuda'):
+    model = ResNet(block=BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
+
+    checkpoint = load(
+        os.path.join(config['exp_path'], config['exp_name_spec'], 'latest_checkpoint.pkl'),
+        map_location=config['device'])
+    model.load_state_dict(checkpoint['model_weights'])
+
+    return model
+
+
+spec_model = initialize_spectrogram_model()
+# run_brain_training()
+spec_path = '/home/dragos/Desktop/Facultate/Licenta/Emotions/SpectrogramData/1076/1076_ITH_HAPPY_UNSPECIFIED.npy'
+spec = np.load(spec_path)
+spec = torch.tensor(spec)
+spec = map_tensor_to_0_1(spec)
+
+windows, windows_indexes = spectrogram_windowing(spec, window_size=120,
+                                                 window_count=3)
+windows = windows.cuda()
+predictions, terminal_layers = spec_model(windows)
+
+predictions = predictions.detach().cpu().numpy()
+entropies = compute_entropy(predictions)
+
+best_window_index = np.argmin(entropies)
+videos_dir = config['video_dir_path']
+file_name = spec_path.split('/')[-1]
+video_path = os.path.join(videos_dir, file_name)
+frame = get_frame_from_video(video_path=video_path, start_index=0, end_index=20,
+                             spectrogram_length=120)

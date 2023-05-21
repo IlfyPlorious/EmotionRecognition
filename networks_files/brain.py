@@ -9,13 +9,9 @@ from util.ioUtil import spectrogram_windowing, compute_entropy, get_frame_from_v
 
 
 class Brain(nn.Module):
-    def __init__(self, spec_model, video_model, config, num_classes: int = 6, ):
+    def __init__(self, num_classes: int = 6):
         super(Brain, self).__init__()
 
-        self.spec_model = spec_model
-        self.video_model = video_model
-        self.config = config
-        self.hook = Hook()
         self.fc1 = nn.Linear(2560, 128)
         self.fc2 = nn.Linear(128, num_classes)
         self.softmax = nn.Softmax(dim=1)

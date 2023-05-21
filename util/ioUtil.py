@@ -422,7 +422,7 @@ def random_spectrogram_windowing(spectrogram, window_size=70, window_count=5, pl
     return windows
 
 
-def try_to_gat_valid_video_capture(path, intensity='XX'):
+def try_to_get_valid_video_capture(path, intensity='XX'):
     video_capture = cv2.VideoCapture(path)
     total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
 
@@ -444,17 +444,17 @@ def get_frame_from_video(video_path, start_index, end_index, spectrogram_length,
     video_path[2] = get_notation_by_emotion(video_path[2])
     video_path[3] = get_notation_by_emotion_level(video_path[3].split('.')[0]) + '.flv'
     video_path = '_'.join(video_path)
-    video_capture, total_frames = try_to_gat_valid_video_capture(video_path)
+    video_capture, total_frames = try_to_get_valid_video_capture(video_path)
 
     if total_frames == 0:
         video_capture.release()
-        video_capture, total_frames = try_to_gat_valid_video_capture(video_path, intensity='LO')
+        video_capture, total_frames = try_to_get_valid_video_capture(video_path, intensity='LO')
         if total_frames == 0:
             video_capture.release()
-            video_capture, total_frames = try_to_gat_valid_video_capture(video_path, intensity='MD')
+            video_capture, total_frames = try_to_get_valid_video_capture(video_path, intensity='MD')
             if total_frames == 0:
                 video_capture.release()
-                video_capture, total_frames = try_to_gat_valid_video_capture(video_path, intensity='HI')
+                video_capture, total_frames = try_to_get_valid_video_capture(video_path, intensity='HI')
 
     start_index_frames = total_frames * start_index // spectrogram_length
     end_index_frames = total_frames * end_index // spectrogram_length
@@ -466,7 +466,12 @@ def get_frame_from_video(video_path, start_index, end_index, spectrogram_length,
 
     if plot:
         plt.figure(), plt.imshow(frame), plt.show()
-    return np.transpose(frame, (2, 0, 1))
+
+    try:
+        return np.transpose(frame, (2, 0, 1))
+    except:
+        print(f'{video_path} creates problems')
+        return None
 
 
 def compute_entropy(probabilities):

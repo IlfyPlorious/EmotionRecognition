@@ -10,6 +10,7 @@ import torch
 
 torch.cuda.empty_cache()
 
+
 class BrainTrainer:
     def __init__(self, model, train_dataloader, eval_dataloader, criterion, optimizer, scheduler, loss_fn, config):
         self.config = config
@@ -38,7 +39,8 @@ class BrainTrainer:
 
         if self.config['resume_training'] is True:
             checkpoint = torch.load(
-                os.path.join(self.config['final_exp_path'], self.config['final_exp_name_spec'], 'latest_checkpoint.pkl'),
+                os.path.join(self.config['final_exp_path'], self.config['final_exp_name'],
+                             'latest_checkpoint.pkl'),
                 map_location=self.config['device'])
             self.model.load_state_dict(checkpoint['model_weights'])
             self.optimizer.load_state_dict(checkpoint['optimizer'])
@@ -47,13 +49,17 @@ class BrainTrainer:
         # this index corresponds to the batch being processed
         # enumerate returns ( index, obj ), and here object is ( spectrogram, label )
 
-        for batch, (features_batch, labels_batch) in enumerate(self.train_dataloader, start=1):
+        for batch, (features_batch, labels_batch, file_names) in enumerate(self.train_dataloader, start=1):
             features_batch = features_batch.cuda()
             labels_batch = labels_batch.cuda()
-            prediction = self.model(features_batch).cuda()
 
             prediction = self.model(features_batch).cuda()
             loss = self.loss_fn(prediction, labels_batch)
+
+            if torch.isnan(torch.tensor(loss)):
+                print(f'We jumped batch no.{batch} because of nan values for {prediction} {file_names}')
+                self.log_file.write(f'We jumped batch no.{batch} because of nan values for {prediction} {file_names}')
+                continue
 
             # Backpropagation
             self.optimizer.zero_grad()
@@ -62,9 +68,13 @@ class BrainTrainer:
 
             features_per_batch = self.config['batch_size']
             loss, current = loss.item(), batch * features_per_batch
+
+            if torch.isnan(torch.tensor(loss)):
+                pass
+                # 1047_ieo_fear_unspecified has problems
+
             print(f"batch: {batch}  loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
             self.log_file.write(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]\n")
-
 
     def test_loop(self):
         size = len(self.eval_dataloader.dataset)
@@ -80,7 +90,7 @@ class BrainTrainer:
         t.start()
 
         with torch.no_grad():
-            for batch, (features_batch, labels_batch) in enumerate(self.eval_dataloader, 0):
+            for batch, (features_batch, labels_batch, spec_names) in enumerate(self.eval_dataloader, 0):
                 features_batch = features_batch.cuda()
                 labels_batch = labels_batch.cuda()
 
@@ -104,10 +114,10 @@ class BrainTrainer:
 
         return correct, test_loss
 
-
     def save_net_state(self, epoch, latest=False, best=False):
         if latest is True:
-            path_to_save = os.path.join(self.config['final_exp_path'], self.config['final_exp_name'], f'latest_checkpoint.pkl')
+            path_to_save = os.path.join(self.config['final_exp_path'], self.config['final_exp_name'],
+                                        f'latest_checkpoint.pkl')
             to_save = {
                 'epoch': epoch,
                 'model_weights': self.model.state_dict(),
@@ -123,7 +133,8 @@ class BrainTrainer:
             }
             torch.save(to_save, path_to_save)
         else:
-            path_to_save = os.path.join(self.config['final_exp_path'], self.config['final_exp_name'], f'latest_checkpoint.pkl')
+            path_to_save = os.path.join(self.config['final_exp_path'], self.config['final_exp_name'],
+                                        f'latest_checkpoint.pkl')
             to_save = {
                 'epoch': epoch,
                 'model_weights': self.model.state_dict(),
@@ -135,7 +146,7 @@ class BrainTrainer:
             torch.save(self.model, path_to_save)
 
     def run(self):
-        self.log_file.write(f'\n\nRunning new training session...\nLogs from {date.today()}\n\n')
+        self.log_file.write(f'\n\nRunning new training session for final brain...\nLogs from {date.today()}\n\n')
 
         for t in range(self.config['train_epochs']):
             print(f"Epoch {t + 1}\n-------------------------------")

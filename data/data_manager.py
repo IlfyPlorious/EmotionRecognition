@@ -129,11 +129,13 @@ class DataManager:
         train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
                                                    batch_size=self.config['batch_size'],
                                                    sampler=train_sampler,
-                                                   pin_memory=True if self.config['device'] == 'cuda' else False)
+                                                   drop_last=True,
+                                                   pin_memory=False)
 
         validation_loader = torch.utils.data.DataLoader(dataset=eval_dataset,
                                                         batch_size=self.config['batch_size'],
                                                         sampler=valid_sampler,
-                                                        pin_memory=True if self.config['device'] == 'cuda' else False)
+                                                        drop_last=True,
+                                                        pin_memory=False)
 
         return train_loader, validation_loader
