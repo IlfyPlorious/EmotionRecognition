@@ -223,41 +223,42 @@ def run_brain_training():
     trainer.run()
 
 
-from util.ioUtil import map_tensor_to_0_1
-
-from networks_files.networks import ResNet
-from networks_files.res_net import BasicBlock
-
-
-def initialize_spectrogram_model(device='cuda'):
-    model = ResNet(block=BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
-
-    checkpoint = load(
-        os.path.join(config['exp_path'], config['exp_name_spec'], 'latest_checkpoint.pkl'),
-        map_location=config['device'])
-    model.load_state_dict(checkpoint['model_weights'])
-
-    return model
-
-
-spec_model = initialize_spectrogram_model()
-# run_brain_training()
-spec_path = '/home/dragos/Desktop/Facultate/Licenta/Emotions/SpectrogramData/1076/1076_ITH_HAPPY_UNSPECIFIED.npy'
-spec = np.load(spec_path)
-spec = torch.tensor(spec)
-spec = map_tensor_to_0_1(spec)
-
-windows, windows_indexes = spectrogram_windowing(spec, window_size=120,
-                                                 window_count=3)
-windows = windows.cuda()
-predictions, terminal_layers = spec_model(windows)
-
-predictions = predictions.detach().cpu().numpy()
-entropies = compute_entropy(predictions)
-
-best_window_index = np.argmin(entropies)
-videos_dir = config['video_dir_path']
-file_name = spec_path.split('/')[-1]
-video_path = os.path.join(videos_dir, file_name)
-frame = get_frame_from_video(video_path=video_path, start_index=0, end_index=20,
-                             spectrogram_length=120)
+run_brain_training()
+# from util.ioUtil import map_tensor_to_0_1
+#
+# from networks_files.networks import ResNet
+# from networks_files.res_net import BasicBlock
+#
+#
+# def initialize_spectrogram_model(device='cuda'):
+#     model = ResNet(block=BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
+#
+#     checkpoint = load(
+#         os.path.join(config['exp_path'], config['exp_name_spec'], 'latest_checkpoint.pkl'),
+#         map_location=config['device'])
+#     model.load_state_dict(checkpoint['model_weights'])
+#
+#     return model
+#
+#
+# spec_model = initialize_spectrogram_model()
+# # run_brain_training()
+# spec_path = '/home/dragos/Desktop/Facultate/Licenta/Emotions/SpectrogramData/1076/1076_ITH_HAPPY_UNSPECIFIED.npy'
+# spec = np.load(spec_path)
+# spec = torch.tensor(spec)
+# spec = map_tensor_to_0_1(spec)
+#
+# windows, windows_indexes = spectrogram_windowing(spec, window_size=120,
+#                                                  window_count=3)
+# windows = windows.cuda()
+# predictions, terminal_layers = spec_model(windows)
+#
+# predictions = predictions.detach().cpu().numpy()
+# entropies = compute_entropy(predictions)
+#
+# best_window_index = np.argmin(entropies)
+# videos_dir = config['video_dir_path']
+# file_name = spec_path.split('/')[-1]
+# video_path = os.path.join(videos_dir, file_name)
+# frame = get_frame_from_video(video_path=video_path, start_index=0, end_index=20,
+#                              spectrogram_length=120)
