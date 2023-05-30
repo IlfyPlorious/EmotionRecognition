@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset
 
 from networks_files.hook import Hook
-from util.ioUtil import spectrogram_windowing, compute_entropy, get_frame_from_video
+from util.ioUtil import spectrogram_windowing, compute_entropy, get_frame_from_video, spectrogram_name_splitter
 
 
 class AudioVideoDataset(Dataset):
@@ -42,6 +42,7 @@ class AudioVideoDataset(Dataset):
     def __getitem__(self, idx):
         spec_idx = idx
 
+        ## ---------- MANAGE SPECTROGRAM --------- ##
         spectrograms = self.get_spectrogram_paths_list()
         spectrogram_path = spectrograms[spec_idx]
         spec_path = spectrogram_path[0]  # element in tuple at index 0 is the spectrogram path
@@ -63,29 +64,50 @@ class AudioVideoDataset(Dataset):
         entropies = compute_entropy(predictions)
 
         best_window_index = np.argmin(entropies)
-        videos_dir = self.config['video_dir_path']
-        file_name = spec_path.split('/')[-1]
-        video_path = os.path.join(videos_dir, file_name)
 
         start, end = windows_indexes[best_window_index]
-
-        frame = get_frame_from_video(video_path=video_path, start_index=start, end_index=end,
-                                     spectrogram_length=spec.shape[2])
-        frame = torch.tensor(frame).to('cuda')
-
         spec_terminal_layer = terminal_layers[best_window_index]
+
+        ## ---------- MANAGE VIDEO FRAME --------- ##
+
+        actor, line, emotion, intensity, _ = spectrogram_name_splitter(spec_path.split('/')[-1])
+        image_data_dir = self.config['video_data']
+        image_actor_dir = os.path.join(image_data_dir, actor)
+        vid_name = f'{actor}_{line}_{emotion}_{intensity}'
+        frames = list(filter(lambda actor_vid: vid_name in actor_vid, os.listdir(image_actor_dir)))
+
+        spectrogram_length = spec.shape[2]
+        frame_numbers = list(map(lambda frame: int(frame.split('_')[-1].split('.')[0]), frames))
+        max_frame_number = np.max(frame_numbers)
+
+        start_index_frames = max_frame_number * start // spectrogram_length
+        end_index_frames = max_frame_number * end // spectrogram_length
+
+        frame_name = None
+
+        if np.min(frame_numbers) > end_index_frames:
+            frame_name = frames[np.argmin(frame_numbers)]
+        else:
+            for i in range(0, len(frame_numbers)):
+                if start_index_frames < frame_numbers[i] < end_index_frames:
+                    frame_name = frames[i]
+                    break
+
+        frame_path = os.path.join(image_actor_dir, frame_name)
+
+        frame_image = np.load(frame_path)
+        frame_image = np.transpose(frame_image, (2, 0, 1))
+        frame_image = torch.tensor([frame_image]).float().cuda()
 
         layer = self.vid_model.get_submodule('avgpool')
         handle = layer.register_forward_hook(self.hook)
 
-        if self.transform:
-            frame = self.transform(frame).expand(1, -1, -1, -1).to('cuda')
-
-        _ = self.vid_model(frame)
+        _ = self.vid_model(frame_image)
 
         video_terminal_layer = self.hook.outputs[0].squeeze()
         self.hook.clear()
 
         features = torch.cat((spec_terminal_layer, video_terminal_layer))
 
+        file_name = spec_path.split('/')[-1]
         return features, label, file_name

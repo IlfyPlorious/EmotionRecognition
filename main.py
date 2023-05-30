@@ -19,7 +19,8 @@ from networks_files.hook import Hook
 import trainer as tr
 from data import data_manager_spectrogram
 from networks_files import networks, res_net
-from util.ioUtil import spectrogram_windowing, compute_entropy, get_frame_from_video
+from util.ioUtil import spectrogram_windowing, compute_entropy, get_frame_from_video, spectrogram_name_splitter, \
+    write_video_frames_as_npy
 
 config = json.load(open('config.json'))
 
@@ -262,3 +263,5 @@ run_brain_training()
 # video_path = os.path.join(videos_dir, file_name)
 # frame = get_frame_from_video(video_path=video_path, start_index=0, end_index=20,
 #                              spectrogram_length=120)
+
+# write_video_frames_as_npy()

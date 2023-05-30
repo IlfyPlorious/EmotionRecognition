@@ -329,34 +329,37 @@ def save_image_data(data, parent_dir, dir, file_name):
 
 def write_video_frames_as_npy():
     video_dir_path = config['video_dir_path']
+    videos = os.listdir(video_dir_path)
+    for actor in range(1001, 1092):
+        videos_for_actor = list(filter(lambda video_name: str(actor) in video_name, videos))
+        print(f'-------- Saving for actor: {actor} ---------')
+        for file in videos_for_actor:
+            video_file = os.path.join(video_dir_path, file)
+            video_capture = cv2.VideoCapture(video_file)
+            total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
 
-    for file in os.listdir(video_dir_path):
-        video_file = os.path.join(video_dir_path, file)
-        video_capture = cv2.VideoCapture(video_file)
-        total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
+            step = total_frames // 10
 
-        step = total_frames // 10
+            start = int(total_frames * 0.07)
+            end = int(total_frames * 0.9)
 
-        start = int(total_frames * 0.07)
-        end = int(total_frames * 0.9)
+            i = start
+            while i < end:
+                ret, frame = video_capture.read()
+                if i % step == 0:
+                    dir_file = file.split("_")[0]
+                    file_name = file.split(".")[0] + f'_frame_{i}'
+                    try:
+                        crop = get_face_cropped_image(frame)
+                        resize = cv2.resize(crop, dsize=(224, 224), interpolation=cv2.INTER_CUBIC)
+                        save_image_data(data=map_to_0_1(resize), parent_dir='ImageData', dir=dir_file,
+                                        file_name=file_name)
+                    except:
+                        print(f'Failed saving file {file}')
 
-        i = start
-        while i < end:
-            ret, frame = video_capture.read()
-            if i % step == 0:
-                dir_file = file.split("_")[0]
-                file_name = file.split(".")[0] + f'_frame_{i}'
-                try:
-                    crop = get_face_cropped_image(frame)
-                    resize = cv2.resize(crop, dsize=(224, 224), interpolation=cv2.INTER_CUBIC)
-                    save_image_data(data=map_to_0_1(resize), parent_dir='ImageData', dir=dir_file,
-                                    file_name=file_name)
-                except:
-                    print(f'Failed saving file {file}')
+                i += 1
 
-            i += 1
-
-        video_capture.release()
+            video_capture.release()
 
 
 def get_face_cropped_image(img):
@@ -480,3 +483,14 @@ def compute_entropy(probabilities):
         for probability in probabilities[idx]:
             entropies[idx] = entropies[idx] - probability * np.log2(probability)
     return entropies
+
+
+def spectrogram_name_splitter(spec_name):
+    actor, line, emotion, intensity = spec_name.split('_')
+    intensity = intensity.split('.')[0]
+    extension = intensity.split('.')[-1]
+
+    emotion = get_notation_by_emotion(emotion)
+    intensity = get_notation_by_emotion_level(intensity)
+
+    return actor, line, emotion, intensity, extension
