@@ -14,6 +14,7 @@ from IPython.display import Audio, display
 from PIL import Image
 from facenet_pytorch import MTCNN
 
+from networks_files.hook import Hook
 from util import AudioFileModel
 from util import VideoFileModel
 
@@ -498,3 +499,50 @@ def spectrogram_name_splitter(spec_name):
     intensity = get_notation_by_emotion_level(intensity)
 
     return actor, line, emotion, intensity, extension
+
+
+def write_pretrained_model_features_for_video(model, start=1001, end=1091):
+    video_dir_path = config['video_dir_path']
+    videos = os.listdir(video_dir_path)
+    for actor in range(start, end):
+        videos_for_actor = list(filter(lambda video_name: str(actor) in video_name, videos))
+        print(f'-------- Saving for actor: {actor} ---------')
+        for file in videos_for_actor:
+            video_file = os.path.join(video_dir_path, file)
+            video_capture = cv2.VideoCapture(video_file)
+            total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
+
+            start = int(total_frames * 0.07)
+            end = int(total_frames * 0.9)
+
+            model = model.to('cuda')
+
+            i = start
+            while i < end:
+                ret, frame = video_capture.read()
+
+                dir_file = file.split("_")[0]
+                file_name = file.split(".")[0] + f'_frame_{i}'
+                try:
+                    crop = get_face_cropped_image(frame)
+                    resize = cv2.resize(crop, dsize=(224, 224), interpolation=cv2.INTER_CUBIC)
+                    resize = map_to_0_1(resize)
+                    features = None
+                    hook = Hook()
+                    layer = model.get_submodule('avgpool')
+                    handle = layer.register_forward_hook(hook)
+
+                    frame_input = torch.tensor([np.transpose(resize, (2, 0, 1))]).float().cuda()
+                    _ = model(frame_input.cuda())
+
+                    features = hook.outputs[0].squeeze()
+                    hook.clear()
+                    save_image_data(data=features.cpu().detach().numpy(), parent_dir='FeaturesData', dir=dir_file,
+                                    file_name=file_name)
+                except Exception as e:
+                    print(e)
+                    print(f'Failed saving file {file}')
+
+                i += 1
+
+            video_capture.release()

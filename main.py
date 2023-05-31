@@ -1,26 +1,22 @@
 import json
 import os
+from threading import Thread
 
 import numpy as np
-import torch
-from matplotlib import pyplot as plt
 from torch import cuda
 from torch import load
 from torch import nn
 from torch import optim
 from torchvision import models
-import cv2
-
-from brain_trainer import BrainTrainer
-from data.data_manager import DataManager
-from networks_files.brain import Brain
-from networks_files.hook import Hook
 
 import trainer as tr
+from brain_trainer import BrainTrainer
 from data import data_manager_spectrogram
+from data.data_manager import DataManager
 from networks_files import networks, res_net
-from util.ioUtil import spectrogram_windowing, compute_entropy, get_frame_from_video, spectrogram_name_splitter, \
-    write_video_frames_as_npy
+from networks_files.brain import Brain
+from util.ioUtil import spectrogram_windowing, compute_entropy, get_frame_from_video, \
+    write_pretrained_model_features_for_video
 
 config = json.load(open('config.json'))
 
@@ -225,6 +221,8 @@ def run_brain_training():
 
 
 run_brain_training()
+
+
 # from util.ioUtil import map_tensor_to_0_1
 #
 # from networks_files.networks import ResNet
@@ -265,3 +263,25 @@ run_brain_training()
 #                              spectrogram_length=120)
 
 # write_video_frames_as_npy()
+# def initialize_pretrained_video_model(num_classes=6, feature_extract=True, use_pretrained=True,
+#                                       device='cuda'):
+#     # Initialize these variables which will be set in this if statement. Each of these
+#     #   variables is model specific.
+#
+#     model = models.resnet50(pretrained=use_pretrained).to(device)
+#     set_parameter_requires_grad(model, feature_extract)
+#     num_features = model.fc.in_features
+#     model.fc = nn.Linear(num_features, num_classes)
+#
+#     return model
+#
+#
+# def set_parameter_requires_grad(model, feature_extracting=True):
+#     if feature_extracting:
+#         for param in model.parameters():
+#             param.requires_grad = False
+#
+#
+# model = initialize_pretrained_video_model()
+#
+# write_pretrained_model_features_for_video(model, start=1008)

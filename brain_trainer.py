@@ -49,11 +49,13 @@ class BrainTrainer:
         # this index corresponds to the batch being processed
         # enumerate returns ( index, obj ), and here object is ( spectrogram, label )
 
-        for batch, (features_batch, labels_batch, file_names) in enumerate(self.train_dataloader, start=1):
-            features_batch = features_batch.cuda()
+        for batch, (spec_features_batch, vid_features_batch, labels_batch, file_names) in enumerate(
+                self.train_dataloader, start=1):
+            vid_features_batch = vid_features_batch.cuda()
+            spec_features_batch = spec_features_batch.cuda()
             labels_batch = labels_batch.cuda()
 
-            prediction = self.model(features_batch).cuda()
+            prediction = self.model(vid_features_batch, spec_features_batch).cuda()
             loss = self.loss_fn(prediction, labels_batch)
 
             if torch.isnan(torch.tensor(loss)):
@@ -72,8 +74,8 @@ class BrainTrainer:
             if torch.isnan(torch.tensor(loss)):
                 pass
                 # 1047_ieo_fear_unspecified has problems
-            if batch % 5 == 1:
-                print(f"batch: {batch}  loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+
+            print(f"batch: {batch}  loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
             self.log_file.write(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]\n")
 
     def test_loop(self):
@@ -90,11 +92,13 @@ class BrainTrainer:
         t.start()
 
         with torch.no_grad():
-            for batch, (features_batch, labels_batch, spec_names) in enumerate(self.eval_dataloader, 0):
-                features_batch = features_batch.cuda()
+            for batch, (spec_features_batch, vid_features_batch, labels_batch, spec_names) in enumerate(
+                    self.eval_dataloader, 0):
+                vid_features_batch = vid_features_batch.cuda()
+                spec_features_batch = spec_features_batch.cuda()
                 labels_batch = labels_batch.cuda()
 
-                prediction = self.model(features_batch).cuda()
+                prediction = self.model(vid_features_batch, spec_features_batch).cuda()
                 loss = self.loss_fn(prediction, labels_batch)
 
                 if not torch.isnan(torch.tensor(loss.item())):

@@ -1,7 +1,7 @@
 {
   "spectrogram_dir": "SpectrogramData",
   "video_dir_path": "/home/dragos/Desktop/Facultate/Licenta/CREMA-D/VideoFlash",
-  "video_data": "ImageData",
+  "video_data": "FeaturesData",
   "batch_size": 16,
   "device": "cuda",
   "train_split": 0.75,

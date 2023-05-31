@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset
 
 from networks_files.hook import Hook
-from util.ioUtil import spectrogram_windowing, compute_entropy, get_frame_from_video, spectrogram_name_splitter
+from util.ioUtil import spectrogram_windowing, compute_entropy, spectrogram_name_splitter
 
 
 class AudioVideoDataset(Dataset):
@@ -93,31 +93,37 @@ class AudioVideoDataset(Dataset):
         start_index_frames = max_frame_number * start // spectrogram_length
         end_index_frames = max_frame_number * end // spectrogram_length
 
-        frame_name = None
+        if start_index_frames == 0:
+            start_index_frames = np.amin(frame_numbers)
 
-        if np.min(frame_numbers) > end_index_frames:
-            frame_name = frames[np.argmin(frame_numbers)]
-        else:
-            for i in range(0, len(frame_numbers)):
-                if start_index_frames < frame_numbers[i] < end_index_frames:
-                    frame_name = frames[i]
-                    break
+        frames_names = []
 
-        frame_path = os.path.join(image_actor_dir, frame_name)
+        for i in range(0, len(frame_numbers)):
+            if frame_numbers[i] == start_index_frames:
+                frames_names.append(frames[i])
+            if frame_numbers[i] == (start_index_frames + end_index_frames) // 2:
+                frames_names.append(frames[i])
+            if frame_numbers[i] == end_index_frames - 1:
+                frames_names.append(frames[i])
 
-        frame_image = np.load(frame_path)
-        frame_image = np.transpose(frame_image, (2, 0, 1))
-        frame_image = torch.tensor([frame_image]).float().cuda()
-
-        layer = self.vid_model.get_submodule('avgpool')
-        handle = layer.register_forward_hook(self.hook)
-
-        _ = self.vid_model(frame_image)
-
-        video_terminal_layer = self.hook.outputs[0].squeeze()
-        self.hook.clear()
-
-        features = torch.cat((spec_terminal_layer, video_terminal_layer))
+        # todo add random +- 2 for midle +- 4 for edges
+        frame_image_features = torch.cat((
+            torch.tensor(np.load(os.path.join(image_actor_dir, frames_names[0]))),
+            torch.tensor(np.load(os.path.join(image_actor_dir, frames_names[1]))),
+            torch.tensor(np.load(os.path.join(image_actor_dir, frames_names[2]))))
+        )
+        frame_image_features = torch.tensor(frame_image_features).cuda()
+        # frame_image = np.transpose(frame_image, (2, 0, 1))
+        # frame_image = torch.tensor([frame_image]).float().cuda()
+        #
+        # layer = self.vid_model.get_submodule('avgpool')
+        # handle = layer.register_forward_hook(self.hook)
+        #
+        # _ = self.vid_model(frame_image)
+        #
+        # video_terminal_layer = self.hook.outputs[0].squeeze()
+        # self.hook.clear()
+        #
 
         file_name = spec_path.split('/')[-1]
-        return features, label, file_name
+        return spec_terminal_layer, frame_image_features, label, file_name

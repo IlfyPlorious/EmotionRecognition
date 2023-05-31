@@ -12,13 +12,15 @@ class Brain(nn.Module):
     def __init__(self, num_classes: int = 6):
         super(Brain, self).__init__()
 
-        self.fc1 = nn.Linear(2560, 128)
-        self.fc2 = nn.Linear(128, num_classes)
+        self.fc1 = nn.Linear(2048 * 3, 2048)
+        self.fc2 = nn.Linear(2048 + 512, 128)
+        self.fc3 = nn.Linear(128, num_classes)
         self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, x):
+    def forward(self, x, y):
         x = self.fc1(x)
-        x = self.fc2(x)
+        x = self.fc2(torch.cat((x, y), dim=1))
+        x = self.fc3(x)
         x = self.softmax(x)
 
         return x
