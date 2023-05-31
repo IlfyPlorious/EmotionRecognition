@@ -7,7 +7,7 @@
   "train_split": 0.75,
   "valid_split": 0.25,
   "train_epochs": 25,
-  "learning_rate": 0.5e-2,
+  "learning_rate": 1e-3,
   "save_file_path": "Logs",
   "exp_path": "NetworksData",
   "exp_name_spec": "ConvolutionalNetworkPart4",

@@ -74,11 +74,21 @@ class AudioVideoDataset(Dataset):
         image_data_dir = self.config['video_data']
         image_actor_dir = os.path.join(image_data_dir, actor)
         vid_name = f'{actor}_{line}_{emotion}_{intensity}'
-        frames = list(filter(lambda actor_vid: vid_name in actor_vid, os.listdir(image_actor_dir)))
+
+        vids = os.listdir(image_actor_dir)
+        frames = list(filter(lambda actor_vid: vid_name in actor_vid, vids))
+
+        i = 0
+        intensities = ['LO', 'MD', 'HI']
+
+        while len(frames) == 0 and i < 3:
+            vid_name = f'{actor}_{line}_{emotion}_{intensities[i]}'
+            frames = list(filter(lambda actor_vid: vid_name in actor_vid, vids))
+            i += 0
 
         spectrogram_length = spec.shape[2]
         frame_numbers = list(map(lambda frame: int(frame.split('_')[-1].split('.')[0]), frames))
-        max_frame_number = np.max(frame_numbers)
+        max_frame_number = np.amax(frame_numbers)
 
         start_index_frames = max_frame_number * start // spectrogram_length
         end_index_frames = max_frame_number * end // spectrogram_length

@@ -72,8 +72,8 @@ class BrainTrainer:
             if torch.isnan(torch.tensor(loss)):
                 pass
                 # 1047_ieo_fear_unspecified has problems
-
-            print(f"batch: {batch}  loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            if batch % 5 == 1:
+                print(f"batch: {batch}  loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
             self.log_file.write(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]\n")
 
     def test_loop(self):
@@ -103,6 +103,10 @@ class BrainTrainer:
 
                 correct += (prediction.argmax(axis=1) == labels_batch.argmax(axis=1)).type(
                     torch.float).sum().item()
+
+                features_per_batch = self.config['batch_size']
+                current = batch * features_per_batch
+                # print(f"batch: {batch}  loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
         test_loss /= not_nan_loss
         correct /= size

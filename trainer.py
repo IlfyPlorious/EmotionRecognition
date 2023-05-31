@@ -90,33 +90,7 @@ class TrainerSpectrogram:
                 spectrogram_batch = spectrogram_batch.cuda()
                 emotion_prediction_batch = emotion_prediction_batch.cuda()
 
-                # best_window_batch = []
-                # best_window_predictions = []
-                #
-                # if self.config['windowing']:
-                #     for i in range(0, len(spectrogram_batch)):
-                #         windows = iou.spectrogram_windowing(spectrogram_batch[i]).cuda()
-                #         emotion_label = emotion_prediction_batch[i]
-                #         window_predictions = self.model(windows)
-                #         correct_label_index = torch.argmax(emotion_label)
-                #         correct_pred_column = window_predictions[:, correct_label_index.item()]
-                #         best_window = torch.argmax(correct_pred_column)
-                #         best_window_batch.append(best_window.item())
-                #         best_window_predictions.append(window_predictions[best_window.item()])
-                #
-                #         self.log_file.write(
-                #             f'\n\nBest window for {iou.get_labels[correct_label_index.item()]} is window {best_window.item()}/5'
-                #             f'\nwith prediction: {window_predictions[best_window.item()]}\n')
-
                 prediction = self.model(spectrogram_batch).cuda()
-
-                # if self.config['windowing']:
-                #     print(f'\nPredictions with best window {best_window_batch} with {best_window_predictions}'
-                #           f'\nPrediction on full spectrogram: {prediction}\n---end-----\n\n\n')
-                #     self.log_file.write(
-                #         f'\nPredictions with best window {best_window_batch} with {best_window_predictions}'
-                #         f'\nPrediction on full spectrogram: {prediction}\n---end-----\n\n\n')
-
                 loss = self.loss_fn(prediction, emotion_prediction_batch)
 
                 if not torch.isnan(torch.tensor(loss.item())):
