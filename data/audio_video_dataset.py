@@ -90,40 +90,102 @@ class AudioVideoDataset(Dataset):
         frame_numbers = list(map(lambda frame: int(frame.split('_')[-1].split('.')[0]), frames))
         max_frame_number = np.amax(frame_numbers)
 
-        start_index_frames = max_frame_number * start // spectrogram_length
-        end_index_frames = max_frame_number * end // spectrogram_length
+        sorted_frame_numbers = sorted(frames)
 
-        if start_index_frames == 0:
-            start_index_frames = np.amin(frame_numbers)
+        randomizer_start_end = np.random.randint(low=0, high=4)
+        randomizer_mid = np.random.randint(low=-2, high=2)
+        # start_index_frames = max_frame_number * start // spectrogram_length
+        # end_index_frames = max_frame_number * end // spectrogram_length
+        start_frame_name = None
+        end_frame_name = None
+        mid_frame_name = None
+        # try:
+        #     start_frame_name = sorted_frame_numbers[
+        #         (len(sorted_frame_numbers) * start // spectrogram_length) + randomizer_start_end]
+        #     end_frame_name = sorted_frame_numbers[
+        #         (len(sorted_frame_numbers) * end // spectrogram_length) - randomizer_start_end - 1]
+        #     mid_frame_name = sorted_frame_numbers[
+        #         (len(sorted_frame_numbers) * end // (spectrogram_length * 2)) + randomizer_mid]
+        try:
+            start_frame_name = [
+                sorted_frame_numbers[
+                    (len(sorted_frame_numbers) * start // spectrogram_length) + randomizer_start_end],
+                sorted_frame_numbers[
+                    (len(sorted_frame_numbers) * start // spectrogram_length) + randomizer_start_end + 1],
+                sorted_frame_numbers[
+                    (len(sorted_frame_numbers) * start // spectrogram_length) + randomizer_start_end + 2]
+            ]
+            end_frame_name = [
+                sorted_frame_numbers[
+                    (len(sorted_frame_numbers) * end // spectrogram_length) - randomizer_start_end - 1],
+                sorted_frame_numbers[
+                    (len(sorted_frame_numbers) * end // spectrogram_length) - randomizer_start_end - 2],
+                sorted_frame_numbers[
+                    (len(sorted_frame_numbers) * end // spectrogram_length) - randomizer_start_end - 3]
+            ]
+            mid_frame_name = [
+                sorted_frame_numbers[
+                    (len(sorted_frame_numbers) * end // (spectrogram_length * 2)) + randomizer_mid - 1],
+                sorted_frame_numbers[
+                    (len(sorted_frame_numbers) * end // (spectrogram_length * 2)) + randomizer_mid],
+                sorted_frame_numbers[
+                    (len(sorted_frame_numbers) * end // (spectrogram_length * 2)) + randomizer_mid + 1]
+            ]
+        except Exception as e:
+            print(e)
+            print(f'Problem with {vid_name}')
+            print(f'Length of sorted_frame_numbers: {len(sorted_frame_numbers)}')
+            print(f'randomizer1: {randomizer_start_end}')
+            print(f'randomizer2: {randomizer_mid}')
+            print(f'start index: {(len(sorted_frame_numbers) * start // spectrogram_length) + randomizer_start_end}')
+            print(f'end index: {(len(sorted_frame_numbers) * end // spectrogram_length) - randomizer_start_end - 1}')
+            print(
+                f'mid index: {(len(sorted_frame_numbers) * (start + end) // (spectrogram_length * 2)) + randomizer_mid}')
 
-        frames_names = []
+        # try:
+        #     frame_image_features = torch.cat((
+        #         torch.tensor(np.load(os.path.join(image_actor_dir, start_frame_name))),
+        #         torch.tensor(np.load(os.path.join(image_actor_dir, mid_frame_name))),
+        #         torch.tensor(np.load(os.path.join(image_actor_dir, end_frame_name))))
+        #     )
+        try:
+            start_stack = []
+            mid_stack = []
+            end_stack = []
+            for frame_name in start_frame_name:
+                frame = torch.tensor(np.load(os.path.join(image_actor_dir, frame_name)))
+                start_stack.append(frame)
 
-        for i in range(0, len(frame_numbers)):
-            if frame_numbers[i] == start_index_frames:
-                frames_names.append(frames[i])
-            if frame_numbers[i] == (start_index_frames + end_index_frames) // 2:
-                frames_names.append(frames[i])
-            if frame_numbers[i] == end_index_frames - 1:
-                frames_names.append(frames[i])
+            for frame_name in mid_frame_name:
+                frame = torch.tensor(np.load(os.path.join(image_actor_dir, frame_name)))
+                mid_stack.append(frame)
 
-        # todo add random +- 2 for midle +- 4 for edges
-        frame_image_features = torch.cat((
-            torch.tensor(np.load(os.path.join(image_actor_dir, frames_names[0]))),
-            torch.tensor(np.load(os.path.join(image_actor_dir, frames_names[1]))),
-            torch.tensor(np.load(os.path.join(image_actor_dir, frames_names[2]))))
-        )
+            for frame_name in end_frame_name:
+                frame = torch.tensor(np.load(os.path.join(image_actor_dir, frame_name)))
+                end_stack.append(frame)
+
+            start_stack = torch.stack(start_stack)
+            mid_stack = torch.stack(mid_stack)
+            end_stack = torch.stack(end_stack)
+
+            frame_image_features = torch.cat((
+                start_stack,
+                mid_stack,
+                end_stack
+            ), dim=1)
+
+            frame_image_features = torch.stack([frame_image_features])
+        except Exception as e:
+            print(e)
+            print(f'Problems with {vid_name}')
+            print(f'Frame names for {vid_name}: {start_frame_name}, {mid_frame_name}, {end_frame_name}')
+            print(f'Frames for {vid_name}: {frame_numbers}')
+            print(f'Start index: {start_frame_name}')
+            print(f'Mid index: {mid_frame_name}')
+            print(f'End index: {end_frame_name}')
+            print(f'Spec path {spec_path}')
+
         frame_image_features = torch.tensor(frame_image_features).cuda()
-        # frame_image = np.transpose(frame_image, (2, 0, 1))
-        # frame_image = torch.tensor([frame_image]).float().cuda()
-        #
-        # layer = self.vid_model.get_submodule('avgpool')
-        # handle = layer.register_forward_hook(self.hook)
-        #
-        # _ = self.vid_model(frame_image)
-        #
-        # video_terminal_layer = self.hook.outputs[0].squeeze()
-        # self.hook.clear()
-        #
 
         file_name = spec_path.split('/')[-1]
         return spec_terminal_layer, frame_image_features, label, file_name

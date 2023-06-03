@@ -1,5 +1,10 @@
+import itertools
 import json
+import math
 import os
+import sys
+from threading import Thread
+from time import sleep
 from os.path import join
 
 import cv2
@@ -501,12 +506,21 @@ def spectrogram_name_splitter(spec_name):
     return actor, line, emotion, intensity, extension
 
 
-def write_pretrained_model_features_for_video(model, start=1001, end=1091):
+def loading_animation(loading, percentage):
+    while loading:
+        sys.stdout.write(
+            '\rSaved files: ' + str(round(percentage, 2)) + '%')
+        sys.stdout.flush()
+        sleep(0.3)
+
+
+def write_pretrained_model_features_for_video(model, start=1001, end=1092):
     video_dir_path = config['video_dir_path']
     videos = os.listdir(video_dir_path)
     for actor in range(start, end):
         videos_for_actor = list(filter(lambda video_name: str(actor) in video_name, videos))
         print(f'-------- Saving for actor: {actor} ---------')
+
         for file in videos_for_actor:
             video_file = os.path.join(video_dir_path, file)
             video_capture = cv2.VideoCapture(video_file)
@@ -529,11 +543,13 @@ def write_pretrained_model_features_for_video(model, start=1001, end=1091):
                     resize = map_to_0_1(resize)
                     features = None
                     hook = Hook()
+
                     layer = model.get_submodule('avgpool')
                     handle = layer.register_forward_hook(hook)
 
                     frame_input = torch.tensor([np.transpose(resize, (2, 0, 1))]).float().cuda()
-                    _ = model(frame_input.cuda())
+                    with torch.no_grad():
+                        _ = model(frame_input.cuda())
 
                     features = hook.outputs[0].squeeze()
                     hook.clear()

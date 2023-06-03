@@ -32,13 +32,13 @@ class DataManager:
                                                  value=1))
         self.actor_dirs = []
         self.actor_dirs_count = 0
-        # for actor in os.listdir(self.config['spectrogram_dir']):
-        #     self.actor_dirs.append(os.path.join(self.config['spectrogram_dir'], actor))
-        #     self.actor_dirs_count += 1
-
-        for actor in range(1001, 1009):
-            self.actor_dirs.append(os.path.join(self.config['spectrogram_dir'], str(actor)))
+        for actor in os.listdir(self.config['spectrogram_dir']):
+            self.actor_dirs.append(os.path.join(self.config['spectrogram_dir'], actor))
             self.actor_dirs_count += 1
+
+        # for actor in range(1001, 1009):
+        #     self.actor_dirs.append(os.path.join(self.config['spectrogram_dir'], str(actor)))
+        #     self.actor_dirs_count += 1
 
         self.vid_model = self.initialize_pretrained_video_model()
         self.spec_model = self.initialize_spectrogram_model()
