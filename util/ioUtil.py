@@ -22,6 +22,7 @@ from facenet_pytorch import MTCNN
 from networks_files.hook import Hook
 from util import AudioFileModel
 from util import VideoFileModel
+from util.AudioFileModel import AudioFile
 
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
 crema_d_dir = os.path.join(parent_dir, 'CREMA-D')
@@ -47,7 +48,7 @@ get_labels = {
 config = json.load(open('config.json'))
 
 
-def get_audio_video_files(limit=4000):
+def get_audio_video_files(limit=4000) -> list[AudioFileModel.AudioFile]:
     wav_files = os.listdir(audio_wav_dir)
     video_files = os.listdir(config['video_dir_path'])
     audio_files_list = list()
@@ -65,18 +66,19 @@ def get_audio_video_files(limit=4000):
         if audio_file.get_length_in_seconds() < 3:
             audio_files_list.append(audio_file)
 
-    for file in video_files[:limit]:
-        actor, sample, emotion, emotion_level = file.split('_')
-        emotion = get_emotion_by_notation(emotion)
-        emotion_level = get_emotion_level_by_notation(emotion_level)
-        video_file_path = join(audio_wav_dir, file)
-        video_capture = cv2.VideoCapture(video_file_path)
-        video_file = VideoFileModel.VideoFile(sample=sample, actor=actor, emotion=emotion,
-                                              emotion_level=emotion_level, video_data=video_capture)
-        if video_file.get_length_in_seconds() < 3:
-            video_files_list.append(video_file)
+    # for file in video_files[:limit]:
+    #     actor, sample, emotion, emotion_level = file.split('_')
+    #     emotion = get_emotion_by_notation(emotion)
+    #     emotion_level = get_emotion_level_by_notation(emotion_level)
+    #     video_file_path = join(audio_wav_dir, file)
+    #     video_capture = cv2.VideoCapture(video_file_path)
+    #     video_file = VideoFileModel.VideoFile(sample=sample, actor=actor, emotion=emotion,
+    #                                           emotion_level=emotion_level, video_data=video_capture)
+    #     if video_file.get_length_in_seconds() < 3:
+    #         video_files_list.append(video_file)
 
-    return audio_files_list, video_files_list
+    # return audio_files_list, video_files_list
+    return audio_files_list
 
 
 def plot_waveform(waveform, sample_rate, title="Waveform", xlim=None, ylim=None):
@@ -150,7 +152,7 @@ def plot_spectrogram(spec, title=None, ylabel="freq_bin", aspect="auto", xmax=No
     plt.show()
 
 
-def get_spectrogram_from_waveform_in_db(waveform, stretched=False):
+def get_spectrogram_from_waveform_in_db(waveform: np.ndarray, stretched=False) -> np.ndarray:
     n_fft = 512
     win_length = None
     hop_length = 128
@@ -171,8 +173,6 @@ def get_spectrogram_from_waveform_in_db(waveform, stretched=False):
         final_spectrogram = spectrogram(waveform)
 
     return librosa.power_to_db(final_spectrogram)
-
-    # Spectrogram size will be 513 on x_axis
 
 
 def stretch_spectrogram(spectrogram, index=1, final_dim=200, n_freq=201, hop_length=None):
@@ -225,7 +225,7 @@ def get_pitch_from_waveform(waveform, sample_rate):
     return F.detect_pitch_frequency(waveform, sample_rate)
 
 
-def get_emotion_level_by_notation(notation):
+def get_emotion_level_by_notation(notation: str) -> str:
     if notation == 'LO':
         return "LOW"
     elif notation == 'MD':
@@ -236,7 +236,7 @@ def get_emotion_level_by_notation(notation):
         return "UNSPECIFIED"
 
 
-def get_notation_by_emotion_level(emotion_level):
+def get_notation_by_emotion_level(emotion_level: str) -> str:
     if emotion_level == 'LOW':
         return "LO"
     elif emotion_level == 'MEDIUM':
@@ -247,7 +247,7 @@ def get_notation_by_emotion_level(emotion_level):
         return "XX"
 
 
-def get_emotion_by_notation(notation):
+def get_emotion_by_notation(notation: str) -> str:
     if notation == 'ANG':
         return "ANGER"
     elif notation == 'DIS':
@@ -262,7 +262,7 @@ def get_emotion_by_notation(notation):
         return "NEUTRAL"
 
 
-def get_notation_by_emotion(emotion):
+def get_notation_by_emotion(emotion: str) -> str:
     if emotion == 'ANGER':
         return "ANG"
     elif emotion == 'DISGUST':
@@ -277,7 +277,7 @@ def get_notation_by_emotion(emotion):
         return "NEU"
 
 
-def get_metadata_from_file_name(file_name):
+def get_metadata_from_file_name(file_name: str) -> dict[str, str | None]:
     metadata = {}
     split = file_name.split('_')
 
@@ -336,7 +336,7 @@ def save_image_data(data, parent_dir, dir, file_name):
 def write_video_frames_as_npy():
     video_dir_path = config['video_dir_path']
     videos = os.listdir(video_dir_path)
-    for actor in range(1076, 1092):
+    for actor in range(1040, 1092):
         videos_for_actor = list(filter(lambda video_name: str(actor) in video_name, videos))
         print(f'-------- Saving for actor: {actor} ---------')
         for file in videos_for_actor:

@@ -1,98 +1,18 @@
-from typing import Callable, Optional, Type, Union, List
+from typing import Callable, Optional, Type, List
 
 import torch
-import torch.nn.functional as F
 from torch import Tensor
 from torch import nn
 
 from networks_files import res_net
 
 
-class EmotionsNetwork2LinLayers(nn.Module):
-    def __init__(self):
-        super(EmotionsNetwork2LinLayers, self).__init__()
-        self.flatten = nn.Flatten()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(369 * 496 * 4, 128),
-            nn.ReLU(),
-            nn.Linear(128, 100),
-            nn.ReLU(),
-            nn.Linear(100, 6)
-        )
-
-    def forward(self, x):
-        x = self.flatten(x)
-        logits = self.linear_relu_stack(x)
-        return logits
-
-
-class EmotionsNetwork2Conv2Layers(nn.Module):
-    def __init__(self):
-        super(EmotionsNetwork2Conv2Layers, self).__init__()
-        # 4 channels because spectrogram tensors shape is [4, 369, 496] which has 4 channels
-        self.conv1 = nn.Conv2d(4, 8, 30)
-        self.conv2 = nn.Conv2d(8, 16, 30)
-        self.fc1 = nn.Linear(4 * 8 * 16, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 6)
-
-    def forward(self, x):
-        # Max pooling over a (6, 6) window
-        x = F.max_pool2d(F.relu(self.conv1(x)), (6, 6))
-        # If the size is a square you can only specify a single number
-        x = F.max_pool2d(F.relu(self.conv2(x)), 6)
-        x = x.view(-1, self.num_flat_features(x))
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-    @staticmethod
-    def num_flat_features(x):
-        size = x.size()[1:]  # all dimensions except the batch dimension
-        num_features = 1
-        for s in size:
-            num_features *= s
-        return num_features
-
-
-class EmotionsNetworkV3(nn.Module):
-    def __init__(self):
-        super(EmotionsNetworkV3, self).__init__()
-        # 4 channels because spectrogram tensors shape is [4, 369, 496] which has 4 channels
-        self.conv1 = nn.Conv2d(1, 8, 10)
-        self.conv2 = nn.Conv2d(8, 16, 10)
-        self.fc1 = nn.Linear(192, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 6)
-
-    def forward(self, x):
-        # Max pooling over a (6, 6) window
-        x = F.max_pool2d(F.relu(self.conv1(x)), (6, 6))
-        # If the size is a square you can only specify a single number
-        x = F.max_pool2d(F.relu(self.conv2(x)), 6)
-        x = x.view(-1, self.num_flat_features(x))
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-    @staticmethod
-    def num_flat_features(x):
-        size = x.size()[1:]  # all dimensions except the batch dimension
-        num_features = 1
-        for s in size:
-            num_features *= s
-        return num_features
-
-
-class ResNet(nn.Module):
+class SpectrogramBrain(nn.Module):
     def __init__(
             self,
-            block: Type[Union[res_net.BasicBlock, res_net.Bottleneck]],
+            block: Type[res_net.BasicBlock],
             layers: List[int],
             num_classes: int = 1000,
-            zero_init_residual: bool = False,
             groups: int = 1,
             width_per_group: int = 64,
             replace_stride_with_dilation: Optional[List[bool]] = None,
@@ -107,8 +27,6 @@ class ResNet(nn.Module):
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
-            # each element in the tuple indicates if we should replace
-            # the 2x2 stride with a dilated convolution instead
             replace_stride_with_dilation = [False, False, False]
         if len(replace_stride_with_dilation) != 3:
             raise ValueError(
@@ -136,19 +54,9 @@ class ResNet(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-        # Zero-initialize the last BN in each residual branch,
-        # so that the residual branch starts with zeros, and each residual block behaves like an identity.
-        # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
-        if zero_init_residual:
-            for m in self.modules():
-                if isinstance(m, res_net.Bottleneck) and m.bn3.weight is not None:
-                    nn.init.constant_(m.bn3.weight, 0)  # type: ignore[arg-type]
-                elif isinstance(m, res_net.BasicBlock) and m.bn2.weight is not None:
-                    nn.init.constant_(m.bn2.weight, 0)  # type: ignore[arg-type]
-
     def _make_layer(
             self,
-            block: Type[Union[res_net.BasicBlock, res_net.Bottleneck]],
+            block: Type[res_net.BasicBlock],
             planes: int,
             blocks: int,
             stride: int = 1,
@@ -185,7 +93,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def _forward_impl(self, x: Tensor) -> (Tensor, Tensor):
-        # See note [TorchScript super()]
+
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -194,7 +102,6 @@ class ResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
-
         x = self.layer4(x)
 
         x = self.avgpool(x)

@@ -4,7 +4,6 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from networks_files.hook import Hook
 from util.ioUtil import spectrogram_windowing, compute_entropy, spectrogram_name_splitter
 
 
@@ -20,7 +19,6 @@ class AudioVideoDataset(Dataset):
 
         self.spec_model = spec_model.to('cuda')
         self.vid_model = vid_model.to('cuda')
-        self.hook = Hook()
 
     def __len__(self):
         length = 0
@@ -94,18 +92,11 @@ class AudioVideoDataset(Dataset):
 
         randomizer_start_end = np.random.randint(low=0, high=4)
         randomizer_mid = np.random.randint(low=-2, high=2)
-        # start_index_frames = max_frame_number * start // spectrogram_length
-        # end_index_frames = max_frame_number * end // spectrogram_length
+
         start_frame_name = None
         end_frame_name = None
         mid_frame_name = None
-        # try:
-        #     start_frame_name = sorted_frame_numbers[
-        #         (len(sorted_frame_numbers) * start // spectrogram_length) + randomizer_start_end]
-        #     end_frame_name = sorted_frame_numbers[
-        #         (len(sorted_frame_numbers) * end // spectrogram_length) - randomizer_start_end - 1]
-        #     mid_frame_name = sorted_frame_numbers[
-        #         (len(sorted_frame_numbers) * end // (spectrogram_length * 2)) + randomizer_mid]
+
         try:
             start_frame_name = [
                 sorted_frame_numbers[
@@ -142,12 +133,6 @@ class AudioVideoDataset(Dataset):
             print(
                 f'mid index: {(len(sorted_frame_numbers) * (start + end) // (spectrogram_length * 2)) + randomizer_mid}')
 
-        # try:
-        #     frame_image_features = torch.cat((
-        #         torch.tensor(np.load(os.path.join(image_actor_dir, start_frame_name))),
-        #         torch.tensor(np.load(os.path.join(image_actor_dir, mid_frame_name))),
-        #         torch.tensor(np.load(os.path.join(image_actor_dir, end_frame_name))))
-        #     )
         try:
             start_stack = []
             mid_stack = []
@@ -184,8 +169,6 @@ class AudioVideoDataset(Dataset):
             print(f'Mid index: {mid_frame_name}')
             print(f'End index: {end_frame_name}')
             print(f'Spec path {spec_path}')
-
-        frame_image_features = torch.tensor(frame_image_features).cuda()
 
         file_name = spec_path.split('/')[-1]
         return spec_terminal_layer, frame_image_features, label, file_name

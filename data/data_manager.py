@@ -8,7 +8,7 @@ from torchvision import models
 from torchvision.transforms import Lambda
 
 from data.audio_video_dataset import AudioVideoDataset
-from networks_files.networks import ResNet
+from networks_files.networks import SpectrogramBrain
 from networks_files.res_net import BasicBlock
 from util import ioUtil
 
@@ -44,7 +44,7 @@ class DataManager:
         self.spec_model = self.initialize_spectrogram_model()
 
     def initialize_spectrogram_model(self, device='cuda'):
-        model = ResNet(block=BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
+        model = SpectrogramBrain(block=BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
 
         checkpoint = load(
             os.path.join(self.config['exp_path'], self.config['exp_name_spec'], 'latest_checkpoint.pkl'),
@@ -85,7 +85,7 @@ class DataManager:
         )
         return dataloader
 
-    def get_train_eval_dataloaders_spectrograms(self):
+    def get_train_eval_dataloaders_audiovideo(self):
         np.random.seed(707)
 
         ## SPLIT DATASET

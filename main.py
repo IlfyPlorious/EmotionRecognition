@@ -13,7 +13,7 @@ from brain_trainer import BrainTrainer
 from data import data_manager_spectrogram
 from data.data_manager import DataManager
 from networks_files import networks, res_net
-from networks_files.brain import Brain, Brain2
+from networks_files.brain import Brain
 from util.ioUtil import spectrogram_windowing, compute_entropy, get_frame_from_video
 
 config = json.load(open('config.json'))
@@ -23,7 +23,7 @@ print(f"Using {device} device")
 
 
 def run_training():
-    model = networks.ResNet(block=res_net.BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
+    model = networks.SpectrogramBrain(block=res_net.BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
     train_dataloader, eval_dataloader = data_manager_spectrogram.DataManagerSpectrograms(
         config).get_train_eval_dataloaders_spectrograms()
     optimizer = optim.SGD(model.parameters(), lr=config['learning_rate'])
@@ -41,38 +41,38 @@ def run_training():
 # run_training()
 
 
-def test_model_for_windows():
-    dataset = data_manager_spectrogram.DataManagerSpectrograms(config).get_dataset_no_loader()
-    model = networks.ResNet(block=res_net.BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
-
-    checkpoint = load(
-        os.path.join(config['exp_path'], config['exp_name_spec'], 'latest_checkpoint.pkl'),
-        map_location=config['device'])
-    model.load_state_dict(checkpoint['model_weights'])
-
-    for (spec, label, spec_path) in dataset:
-        spec = spec.cuda()
-        label = label.cuda()
-
-        windows, windows_indexes = spectrogram_windowing(spec, window_size=120, window_count=3)
-        windows = windows.cuda()
-
-        predictions, terminal_layers = model(windows)
-
-        predictions = predictions.detach().cpu().numpy()
-        entropies = compute_entropy(predictions)
-
-        best_window_index = np.argmin(entropies)
-
-        videos_dir = config['video_dir_path']
-        file_name = spec_path.split('/')[-1]
-        video_path = os.path.join(videos_dir, file_name)
-
-        start, end = windows_indexes[best_window_index]
-
-        frame = get_frame_from_video(video_path=video_path, start_index=start, end_index=end,
-                                     spectrogram_length=spec.shape[2], plot=True)
-        spec_terminal_layer = terminal_layers[best_window_index]
+# def test_model_for_windows():
+#     dataset = data_manager_spectrogram.DataManagerSpectrograms(config).get_dataset_no_loader()
+#     model = networks.SpectrogramBrain(block=res_net.BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
+#
+#     checkpoint = load(
+#         os.path.join(config['exp_path'], config['exp_name_spec'], 'latest_checkpoint.pkl'),
+#         map_location=config['device'])
+#     model.load_state_dict(checkpoint['model_weights'])
+#
+#     for (spec, label, spec_path) in dataset:
+#         spec = spec.cuda()
+#         label = label.cuda()
+#
+#         windows, windows_indexes = spectrogram_windowing(spec, window_size=120, window_count=3)
+#         windows = windows.cuda()
+#
+#         predictions, terminal_layers = model(windows)
+#
+#         predictions = predictions.detach().cpu().numpy()
+#         entropies = compute_entropy(predictions)
+#
+#         best_window_index = np.argmin(entropies)
+#
+#         videos_dir = config['video_dir_path']
+#         file_name = spec_path.split('/')[-1]
+#         video_path = os.path.join(videos_dir, file_name)
+#
+#         start, end = windows_indexes[best_window_index]
+#
+#         frame = get_frame_from_video(video_path=video_path, start_index=start, end_index=end,
+#                                      spectrogram_length=spec.shape[2], plot=True)
+#         spec_terminal_layer = terminal_layers[best_window_index]
 
 
 # test_model_for_windows()
@@ -205,8 +205,8 @@ def test_model_for_windows():
 
 def run_brain_training():
     # model = Brain().to(device)
-    model = Brain2().to(device)
-    train_dataloader, eval_dataloader = DataManager(config=config).get_train_eval_dataloaders_spectrograms()
+    model = Brain().to(device)
+    train_dataloader, eval_dataloader = DataManager(config=config).get_train_eval_dataloaders_audiovideo()
     optimizer = optim.SGD(model.parameters(), lr=config['learning_rate'])
     scheduler = optim.lr_scheduler.LinearLR(optimizer=optimizer, total_iters=config['train_epochs'] * 0.5)
 

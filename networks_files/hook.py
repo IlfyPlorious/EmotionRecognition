@@ -7,5 +7,6 @@ class Hook:
         self.outputs.append(module_out)
 
     def clear(self):
+        # method for clearing hook data
         self.outputs = []
 

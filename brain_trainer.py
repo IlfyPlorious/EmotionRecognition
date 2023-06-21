@@ -73,7 +73,6 @@ class BrainTrainer:
 
             if torch.isnan(torch.tensor(loss)):
                 pass
-                # 1047_ieo_fear_unspecified has problems
 
             if batch % 5 == 0:
                 print(f"batch: {batch}  loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
@@ -95,7 +94,7 @@ class BrainTrainer:
 
         with torch.no_grad():
             for batch, (spec_features_batch, vid_features_batch, labels_batch, spec_names) in enumerate(
-                    self.eval_dataloader, 0):
+                    self.eval_dataloader, 1):
                 vid_features_batch = vid_features_batch.cuda()
                 spec_features_batch = spec_features_batch.cuda()
                 labels_batch = labels_batch.cuda()
