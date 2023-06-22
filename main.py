@@ -1,5 +1,7 @@
+import csv
 import json
 import os
+from datetime import date
 
 import numpy as np
 import torch
@@ -23,7 +25,7 @@ print(f"Using {device} device")
 
 
 def run_training():
-    model = networks.SpectrogramBrain(block=res_net.BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
+    model = networks.SpectrogramBrain(block=res_net.BasicBlock, layers=[2, 2, 3, 2], num_classes=6).to(device)
     train_dataloader, eval_dataloader = data_manager_spectrogram.DataManagerSpectrograms(
         config).get_train_eval_dataloaders_spectrograms()
     optimizer = optim.SGD(model.parameters(), lr=config['learning_rate'])
@@ -39,7 +41,6 @@ def run_training():
 
 
 # run_training()
-
 
 # def test_model_for_windows():
 #     dataset = data_manager_spectrogram.DataManagerSpectrograms(config).get_dataset_no_loader()
@@ -219,6 +220,11 @@ def run_brain_training():
     trainer.run()
 
 
+run_training()
+config['train_epochs'] = 20
+config['learning_rate'] = 0.01
+
+torch.cuda.empty_cache()
 run_brain_training()
 
 # from util.ioUtil import map_tensor_to_0_1
@@ -339,4 +345,3 @@ run_brain_training()
 #     print(f'Problems with {vid_name}')
 #
 # frame_image_features = torch.tensor(frame_image_features).cuda()
-

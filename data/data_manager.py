@@ -36,15 +36,11 @@ class DataManager:
             self.actor_dirs.append(os.path.join(self.config['spectrogram_dir'], actor))
             self.actor_dirs_count += 1
 
-        # for actor in range(1001, 1009):
-        #     self.actor_dirs.append(os.path.join(self.config['spectrogram_dir'], str(actor)))
-        #     self.actor_dirs_count += 1
-
         self.vid_model = self.initialize_pretrained_video_model()
         self.spec_model = self.initialize_spectrogram_model()
 
     def initialize_spectrogram_model(self, device='cuda'):
-        model = SpectrogramBrain(block=BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
+        model = SpectrogramBrain(block=BasicBlock, layers=[2, 2, 3, 2], num_classes=6).to(device)
 
         checkpoint = load(
             os.path.join(self.config['exp_path'], self.config['exp_name_spec'], 'latest_checkpoint.pkl'),

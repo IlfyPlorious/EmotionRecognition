@@ -1,3 +1,4 @@
+import csv
 import itertools
 import os
 import sys
@@ -5,7 +6,6 @@ from datetime import date
 from threading import Thread
 from time import sleep
 
-from util import ioUtil as iou
 import torch
 
 torch.cuda.empty_cache()
@@ -36,6 +36,8 @@ class BrainTrainer:
 
     def train_loop(self):
         size = len(self.train_dataloader.dataset)
+        batch_count = 0
+        train_loss, correct = 0, 0
 
         if self.config['resume_training'] is True:
             checkpoint = torch.load(
@@ -68,16 +70,25 @@ class BrainTrainer:
             loss.backward()
             self.optimizer.step()
 
+            if not torch.isnan(torch.tensor(loss.item())):
+                train_loss += loss.item()
+                batch_count += 1
+
             features_per_batch = self.config['batch_size']
             loss, current = loss.item(), batch * features_per_batch
-
-            if torch.isnan(torch.tensor(loss)):
-                pass
 
             if batch % 5 == 0:
                 print(f"batch: {batch}  loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
             self.log_file.write(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]\n")
+
+            correct += (prediction.argmax(axis=1) == labels_batch.argmax(axis=1)).type(
+                torch.float).sum().item()
+
+        train_loss /= batch_count
+        correct /= size
+
+        return 100 * correct, train_loss
 
     def test_loop(self):
         size = len(self.eval_dataloader.dataset)
@@ -109,10 +120,6 @@ class BrainTrainer:
                 correct += (prediction.argmax(axis=1) == labels_batch.argmax(axis=1)).type(
                     torch.float).sum().item()
 
-                features_per_batch = self.config['batch_size']
-                current = batch * features_per_batch
-                # print(f"batch: {batch}  loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-
         test_loss /= not_nan_loss
         correct /= size
         print(f"Test Error: \n Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
@@ -121,7 +128,7 @@ class BrainTrainer:
         self.loading_testing = False
         print()
 
-        return correct, test_loss
+        return 100 * correct, test_loss
 
     def save_net_state(self, epoch, latest=False, best=False):
         if latest is True:
@@ -160,11 +167,27 @@ class BrainTrainer:
         for t in range(self.config['train_epochs']):
             print(f"Epoch {t + 1}\n-------------------------------")
             self.log_file.write(f"Epoch {t + 1}\n-------------------------------\n")
-            self.train_loop()
-            self.save_net_state(epoch=t + 1)
-            accuracy, loss = self.test_loop()
-            self.epoch_loss_data.append(loss)
+            accuracy_train, loss_train = self.train_loop()
+            self.save_net_state(epoch=t + 1, latest=True)
+            accuracy_test, loss_test = self.test_loop()
+            self.epoch_loss_data.append(loss_test)
             self.scheduler.step()
+
+            train_test_data_path = f'Logs/brain_{date.today()}.csv'
+            fields = ['epoch', 'train_acc', 'test_acc', 'train_loss', 'test_loss']
+            csv_created = os.path.exists(train_test_data_path)
+            with open(train_test_data_path, 'a', encoding='UTF8') as file:
+                writer = csv.DictWriter(file, fieldnames=fields)
+                if not csv_created:
+                    writer.writeheader()
+                data = {
+                    'epoch': t,
+                    'train_acc': accuracy_train,
+                    'test_acc': accuracy_test,
+                    'train_loss': loss_train,
+                    'test_loss': loss_test
+                }
+                writer.writerow(data)
 
         print(f"Loss data: {sum(self.epoch_loss_data) / len(self.epoch_loss_data)}")
         self.log_file.write(f"Loss data: {sum(self.epoch_loss_data) / len(self.epoch_loss_data)}\n")

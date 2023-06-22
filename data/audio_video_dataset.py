@@ -56,7 +56,8 @@ class AudioVideoDataset(Dataset):
         windows, windows_indexes = spectrogram_windowing(spec, window_size=self.window_size,
                                                          window_count=self.window_count)
         windows = windows.cuda()
-        predictions, terminal_layers = self.spec_model(windows)
+        with torch.no_grad():
+            predictions, terminal_layers = self.spec_model(windows)
 
         predictions = predictions.detach().cpu().numpy()
         entropies = compute_entropy(predictions)

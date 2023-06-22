@@ -31,7 +31,7 @@ brain_model = Brain().to(device)
 train_dataloader_brain, eval_dataloader_brain = DataManager(config=config).get_train_eval_dataloaders_audiovideo()
 brain_model.load_state_dict(brain_checkpoint['model_weights'])
 
-spec_model = SpectrogramBrain(block=BasicBlock, layers=[1, 1, 1, 1], num_classes=6).to(device)
+spec_model = SpectrogramBrain(block=BasicBlock, layers=[2, 2, 3, 2], num_classes=6).to(device)
 train_dataloader_spec, eval_dataloader_spec = DataManagerSpectrograms(
     config=config).get_train_eval_dataloaders_spectrograms()
 spec_model.load_state_dict(spec_checkpoint['model_weights'])
@@ -89,8 +89,8 @@ def get_conf_mat_spec():
 
 
 print('Generating confusion matrix...')
-conf_mat = get_conf_mat_spec()
-# conf_mat = get_conf_mat_brain()
+# conf_mat = get_conf_mat_spec()
+conf_mat = get_conf_mat_brain()
 h, w = conf_mat.shape
 for i in range(0, h):
     sum = np.sum(conf_mat[i])
@@ -104,3 +104,13 @@ plt.ylabel('Predicții', fontsize=13)
 plt.xlabel('Etichete', fontsize=13)
 plt.title('Matrice de confuzie', fontsize=17)
 plt.show()
+
+# file1 = 'ImageData/1013/1013_DFA_DIS_XX_frame_42.npy'
+# file2 = 'ImageData/1044/1044_IEO_HAP_MD_frame_42.npy'
+#
+# frame1 = np.load(file1)
+# frame2 = np.load(file2)
+#
+# plt.figure('1013_DFA_DIS_XX'), plt.imshow(frame1[:, :, ::-1])
+# plt.figure('1044_IEO_HAP_MD'), plt.imshow(frame2[:, :, ::-1])
+# plt.show()
