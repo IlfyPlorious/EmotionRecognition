@@ -1,10 +1,5 @@
-import itertools
 import json
-import math
 import os
-import sys
-from threading import Thread
-from time import sleep
 from os.path import join
 
 import cv2
@@ -13,7 +8,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchaudio
-import torchaudio.functional as F
 import torchaudio.transforms as T
 from IPython.display import Audio, display
 from PIL import Image
@@ -21,7 +15,6 @@ from facenet_pytorch import MTCNN
 
 from networks_files.hook import Hook
 from util import AudioFileModel
-from util import VideoFileModel
 from util.AudioFileModel import AudioFile
 
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
@@ -48,11 +41,10 @@ get_labels = {
 config = json.load(open('config.json'))
 
 
-def get_audio_video_files(limit=4000) -> list[AudioFileModel.AudioFile]:
+def get_audio_files(limit=4000, more_than_3_seconds=False) -> list[AudioFileModel.AudioFile]:
     wav_files = os.listdir(audio_wav_dir)
-    video_files = os.listdir(config['video_dir_path'])
-    audio_files_list = list()
-    video_files_list = list()
+    audio_files_list_less_3 = list()
+    audio_files_list_more_3 = list()
     for file in wav_files[:limit]:
         actor, sample, emotion, emotion_level = file.split('_')
         emotion = get_emotion_by_notation(emotion)
@@ -64,92 +56,11 @@ def get_audio_video_files(limit=4000) -> list[AudioFileModel.AudioFile]:
                                               emotion_level=emotion_level, metadata=metadata,
                                               waveform_data=waveform_data, sample_rate=sample_rate)
         if audio_file.get_length_in_seconds() < 3:
-            audio_files_list.append(audio_file)
+            audio_files_list_less_3.append(audio_file)
+        else:
+            audio_files_list_more_3.append(audio_file)
 
-    # for file in video_files[:limit]:
-    #     actor, sample, emotion, emotion_level = file.split('_')
-    #     emotion = get_emotion_by_notation(emotion)
-    #     emotion_level = get_emotion_level_by_notation(emotion_level)
-    #     video_file_path = join(audio_wav_dir, file)
-    #     video_capture = cv2.VideoCapture(video_file_path)
-    #     video_file = VideoFileModel.VideoFile(sample=sample, actor=actor, emotion=emotion,
-    #                                           emotion_level=emotion_level, video_data=video_capture)
-    #     if video_file.get_length_in_seconds() < 3:
-    #         video_files_list.append(video_file)
-
-    # return audio_files_list, video_files_list
-    return audio_files_list
-
-
-def plot_waveform(waveform, sample_rate, title="Waveform", xlim=None, ylim=None):
-    waveform = waveform.numpy()
-
-    num_channels, num_frames = waveform.shape
-    time_axis = torch.arange(0, num_frames) / sample_rate
-
-    figure, axes = plt.subplots(num_channels, 1)
-    if num_channels == 1:
-        axes = [axes]
-    for c in range(num_channels):
-        axes[c].plot(time_axis, waveform[c], linewidth=1)
-        axes[c].grid(True)
-        if num_channels > 1:
-            axes[c].set_ylabel(f'Channel {c + 1}')
-        if xlim:
-            axes[c].set_xlim(xlim)
-        if ylim:
-            axes[c].set_ylim(ylim)
-    figure.suptitle(title)
-    plt.show()
-
-
-def plot_specgram(file, title="Spectrogram", save_dir=None, xlim=None):
-    waveform = file.waveform_data.numpy()
-    sample_rate = file.sample_rate
-    num_channels, num_frames = waveform.shape
-    time_axis = torch.arange(0, num_frames) / sample_rate
-
-    figure, axes = plt.subplots(num_channels, 1)
-    if num_channels == 1:
-        axes = [axes]
-    for c in range(num_channels):
-        axes[c].specgram(waveform[c], Fs=sample_rate)
-        if num_channels > 1:
-            axes[c].set_ylabel(f'Channel {c + 1}')
-        if xlim:
-            axes[c].set_xlim(xlim)
-    if save_dir:
-        plt.axis('off')
-        file_path = os.path.join(save_dir, file.get_file_name())
-        plt.savefig(file_path, bbox_inches='tight', transparent=True, pad_inches=0)
-        plt.close()
-    else:
-        figure.suptitle(title)
-        plt.show()
-
-
-def play_audio(waveform, sample_rate):
-    waveform = waveform.numpy()
-
-    num_channels, num_frames = waveform.shape
-    if num_channels == 1:
-        display(Audio(waveform[0], rate=sample_rate))
-    elif num_channels == 2:
-        display(Audio((waveform[0], waveform[1]), rate=sample_rate))
-    else:
-        raise ValueError("Waveform with more than 2 channels are not supported.")
-
-
-def plot_spectrogram(spec, title=None, ylabel="freq_bin", aspect="auto", xmax=None):
-    fig, axs = plt.subplots(1, 1)
-    axs.set_title(title or "Spectrogram (db)")
-    axs.set_ylabel(ylabel)
-    axs.set_xlabel("frame")
-    im = axs.imshow(spec, origin="lower", aspect=aspect)
-    if xmax:
-        axs.set_xlim((0, xmax))
-    fig.colorbar(im, ax=axs)
-    plt.show()
+    return audio_files_list_more_3 if more_than_3_seconds else audio_files_list_less_3
 
 
 def get_spectrogram_from_waveform_in_db(waveform: np.ndarray, stretched=False) -> np.ndarray:
@@ -186,7 +97,8 @@ def stretch_spectrogram(spectrogram, index=1, final_dim=200, n_freq=201, hop_len
     return stretched_spectrogram
 
 
-def save_spectrogram_data(file, save_dir='SpectrogramData', stretched=False, start_slice=0.05, end_slice=0.95):
+def save_spectrogram_data(file: AudioFile, save_dir='SpectrogramData', stretched=False, start_slice=0.05,
+                          end_slice=0.95):
     no_frames = len(file.waveform_data[0])
     start = int(no_frames * start_slice)
     end = int(no_frames * end_slice)
@@ -199,30 +111,6 @@ def save_spectrogram_data(file, save_dir='SpectrogramData', stretched=False, sta
         os.makedirs(actor_dir)
 
     np.save(saved_file_name, spectrogram)
-
-
-def get_waveform_from_spectrogram(spectrogram):
-    n_fft = 1024
-    win_length = None
-    hop_length = 512
-
-    griffin_lim = T.GriffinLim(
-        n_fft=n_fft,
-        win_length=win_length,
-        hop_length=hop_length,
-    )
-
-    # Transform into waveform
-    return griffin_lim(spectrogram)
-
-
-def get_stretched_spectrogram(spectrogram, rate=1):
-    stretch = torchaudio.transforms.TimeStretch(n_freq=1)
-    return stretch(spectrogram, rate)
-
-
-def get_pitch_from_waveform(waveform, sample_rate):
-    return F.detect_pitch_frequency(waveform, sample_rate)
 
 
 def get_emotion_level_by_notation(notation: str) -> str:
@@ -277,35 +165,7 @@ def get_notation_by_emotion(emotion: str) -> str:
         return "NEU"
 
 
-def get_metadata_from_file_name(file_name: str) -> dict[str, str | None]:
-    metadata = {}
-    split = file_name.split('_')
-
-    metadata['actor'] = split[0]
-    metadata['sample'] = split[1]
-    metadata['emotion'] = split[2]
-    metadata['emotion_intensity'] = split[3]
-
-    if 'frame' in file_name:
-        frame = split[5].split('.')[0]
-        metadata['frame'] = frame
-    else:
-        metadata['frame'] = None
-
-    return metadata
-
-
-def save_spectrograms_to_dir(spectrograms_count=500, dir_name='Spectrograms'):
-    for file in get_audio_video_files(spectrograms_count):
-        save_dir = os.path.join(parent_dir, dir_name)
-        file_name = f"{file.actor}_{file.sample}_{file.emotion}_{file.emotion_level}"
-        print(f'Saving {file_name}...')
-        plot_specgram(waveform=file.waveform_data, sample_rate=file.sample_rate, save_dir=save_dir,
-                      file_name=file_name)
-        print(f'File {file_name} saved in {save_dir}')
-
-
-def map_tensor_to_0_1(tensor):
+def map_tensor_to_0_1(tensor: torch.Tensor) -> torch.Tensor:
     minimum = torch.min(tensor)
     maximum = torch.max(tensor)
     return torch.div(tensor - minimum, maximum - minimum)
@@ -336,7 +196,7 @@ def save_image_data(data, parent_dir, dir, file_name):
 def write_video_frames_as_npy():
     video_dir_path = config['video_dir_path']
     videos = os.listdir(video_dir_path)
-    for actor in range(1040, 1092):
+    for actor in range(1001, 1092):
         videos_for_actor = list(filter(lambda video_name: str(actor) in video_name, videos))
         print(f'-------- Saving for actor: {actor} ---------')
         for file in videos_for_actor:
@@ -365,7 +225,7 @@ def write_video_frames_as_npy():
                         except:
                             print(f'Failed saving file {file}')
                 except:
-                    print('something')
+                    print('Something went wrong')
 
                 i += 1
 
@@ -452,41 +312,6 @@ def try_to_get_valid_video_capture(path, intensity='XX'):
     return video_capture, total_frames
 
 
-def get_frame_from_video(video_path, start_index, end_index, spectrogram_length, plot=False):
-    video_path = video_path.split('_')
-    video_path[2] = get_notation_by_emotion(video_path[2])
-    video_path[3] = get_notation_by_emotion_level(video_path[3].split('.')[0]) + '.flv'
-    video_path = '_'.join(video_path)
-    video_capture, total_frames = try_to_get_valid_video_capture(video_path)
-
-    if total_frames == 0:
-        video_capture.release()
-        video_capture, total_frames = try_to_get_valid_video_capture(video_path, intensity='LO')
-        if total_frames == 0:
-            video_capture.release()
-            video_capture, total_frames = try_to_get_valid_video_capture(video_path, intensity='MD')
-            if total_frames == 0:
-                video_capture.release()
-                video_capture, total_frames = try_to_get_valid_video_capture(video_path, intensity='HI')
-
-    start_index_frames = total_frames * start_index // spectrogram_length
-    end_index_frames = total_frames * end_index // spectrogram_length
-
-    frame_number = np.random.randint(low=start_index_frames, high=end_index_frames)
-    video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)
-    res, frame = video_capture.read()
-    video_capture.release()
-
-    if plot:
-        plt.figure(), plt.imshow(frame), plt.show()
-
-    try:
-        return np.transpose(frame, (2, 0, 1))
-    except:
-        print(f'{video_path} creates problems')
-        return None
-
-
 def compute_entropy(probabilities):
     entropies = np.zeros(len(probabilities))
     for idx in range(len(probabilities)):
@@ -504,14 +329,6 @@ def spectrogram_name_splitter(spec_name):
     intensity = get_notation_by_emotion_level(intensity)
 
     return actor, line, emotion, intensity, extension
-
-
-def loading_animation(loading, percentage):
-    while loading:
-        sys.stdout.write(
-            '\rSaved files: ' + str(round(percentage, 2)) + '%')
-        sys.stdout.flush()
-        sleep(0.3)
 
 
 def write_pretrained_model_features_for_video(model, start=1001, end=1092):

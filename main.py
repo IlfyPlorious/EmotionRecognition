@@ -1,22 +1,15 @@
-import csv
 import json
-import os
-from datetime import date
 
-import numpy as np
-import torch
 from torch import cuda
-from torch import load
 from torch import nn
 from torch import optim
 
-import trainer as tr
-from brain_trainer import BrainTrainer
+from trainers import trainer as tr
+from trainers.brain_trainer import BrainTrainer
 from data import data_manager_spectrogram
 from data.data_manager import DataManager
 from networks_files import networks, res_net
 from networks_files.brain import Brain
-from util.ioUtil import spectrogram_windowing, compute_entropy, get_frame_from_video
 
 config = json.load(open('config.json'))
 
@@ -220,12 +213,18 @@ def run_brain_training():
     trainer.run()
 
 
-run_training()
-config['train_epochs'] = 20
-config['learning_rate'] = 0.01
-
-torch.cuda.empty_cache()
 run_brain_training()
+
+# torch.cuda.empty_cache()
+#
+# config['train_epochs'] = 100
+# # config['train_epochs'] = 100
+# config['learning_rate'] = 0.01
+# # config['learning_rate'] = 0.001
+#
+# time.sleep(1)
+#
+# run_brain_training()
 
 # from util.ioUtil import map_tensor_to_0_1
 #
