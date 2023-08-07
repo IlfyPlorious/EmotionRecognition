@@ -12,6 +12,8 @@ import torchaudio.transforms as T
 from IPython.display import Audio, display
 from PIL import Image
 from facenet_pytorch import MTCNN
+from torch import nn
+from torchvision import models
 
 from networks_files.hook import Hook
 from util import AudioFileModel
@@ -178,7 +180,7 @@ def map_to_0_1(matrix):
 
 
 def save_image_data(data, parent_dir, dir, file_name):
-    print(f'Saving file {file_name}...')
+    # print(f'Saving file {file_name}...')
     if parent_dir is None:
         pass
     else:
@@ -191,144 +193,6 @@ def save_image_data(data, parent_dir, dir, file_name):
             os.makedirs(actor_dir)
 
         np.save(os.path.join(actor_dir, file_name), np.array(data))
-
-
-def write_video_frames_as_npy():
-    video_dir_path = config['video_dir_path']
-    videos = os.listdir(video_dir_path)
-    for actor in range(1001, 1092):
-        videos_for_actor = list(filter(lambda video_name: str(actor) in video_name, videos))
-        print(f'-------- Saving for actor: {actor} ---------')
-        for file in videos_for_actor:
-            video_file = os.path.join(video_dir_path, file)
-            video_capture = cv2.VideoCapture(video_file)
-            total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
-
-            step = int(total_frames // 10)
-
-            start = int(total_frames * 0.07)
-            end = int(total_frames * 0.9)
-
-            i = start
-            while i < end:
-                ret, frame = video_capture.read()
-
-                try:
-                    if i % step == 0:
-                        dir_file = file.split("_")[0]
-                        file_name = file.split(".")[0] + f'_frame_{i}'
-                        try:
-                            crop = get_face_cropped_image(frame)
-                            resize = cv2.resize(crop, dsize=(224, 224), interpolation=cv2.INTER_CUBIC)
-                            save_image_data(data=map_to_0_1(resize), parent_dir='ImageData', dir=dir_file,
-                                            file_name=file_name)
-                        except:
-                            print(f'Failed saving file {file}')
-                except:
-                    print('Something went wrong')
-
-                i += 1
-
-            video_capture.release()
-
-
-def get_face_cropped_image(img):
-    pil_img = Image.fromarray(img.astype(np.uint8))
-
-    mtcnn = MTCNN()
-
-    # # Get cropped and prewhitened image tensor
-    coord, _ = mtcnn.detect(pil_img)
-    y_tl = int(coord[0][0])  # top left y coordinate
-    x_tl = int(coord[0][1])  # top left x coordinate
-    y_br = int(coord[0][2])  # bottom right y coordinate
-    x_br = int(coord[0][3])  # bottom right x coordinate
-
-    return img[x_tl:x_br, y_tl:y_br, :]
-
-
-def spectrogram_windowing(spectrogram, window_size=70, window_count=5, plot=False):
-    channels, frequencies, timespan = spectrogram.shape
-    windows = torch.empty((window_count, channels, frequencies, window_size))
-    windows_indexes = list()
-
-    if window_count == 1:
-        return [spectrogram[:, :, :window_size]]
-
-    window_overlap = int((window_count * window_size - timespan) / (window_count - 1))
-
-    for i in range(0, window_count - 1):
-        windows[i] = spectrogram[:, :,
-                     i * (window_size - window_overlap): i * (window_size - window_overlap) + window_size]
-
-        windows_indexes.append((i * (window_size - window_overlap), i * (window_size - window_overlap) + window_size))
-
-    windows[window_count - 1] = spectrogram[:, :, timespan - window_size:]
-    windows_indexes.append((timespan - window_size, spectrogram.shape[2]))
-
-    if plot:
-        plt.figure(), plt.subplot(window_count + 1, 1, 1), plt.imshow(torch.permute(spectrogram, (1, 2, 0)))
-        for i in range(0, window_count):
-            plt.subplot(window_count + 1, 1, i + 2), plt.imshow(torch.permute(windows[i], (1, 2, 0)))
-
-        plt.show()
-
-    return windows, windows_indexes
-
-
-def random_spectrogram_windowing(spectrogram, window_size=70, window_count=5, plot=False):
-    channels, frequencies, timespan = spectrogram.shape
-    windows = torch.empty((window_count, channels, frequencies, window_size))
-
-    for i in range(0, window_count):
-        start = np.random.randint(low=0, high=timespan - window_size)
-        end = start + window_size
-        windows[i] = spectrogram[:, :, start:end]
-
-    if plot:
-        plt.figure(), plt.subplot(window_count + 1, 1, 1), plt.imshow(torch.permute(spectrogram, (1, 2, 0)))
-        for i in range(0, window_count):
-            plt.subplot(window_count + 1, 1, i + 2), plt.imshow(torch.permute(windows[i], (1, 2, 0)))
-
-        plt.show()
-
-    return windows
-
-
-def try_to_get_valid_video_capture(path, intensity='XX'):
-    video_capture = cv2.VideoCapture(path)
-    total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
-
-    if total_frames == 0:
-        video_capture.release()
-        video_path_split = path.split('_')
-        video_path_split[-1] = f'{intensity}.flv'
-
-        new_path = '_'.join(video_path_split)
-
-        video_capture = cv2.VideoCapture(new_path)
-        total_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
-
-    return video_capture, total_frames
-
-
-def compute_entropy(probabilities):
-    entropies = np.zeros(len(probabilities))
-    for idx in range(len(probabilities)):
-        for probability in probabilities[idx]:
-            entropies[idx] = entropies[idx] - probability * np.log2(probability)
-    return entropies
-
-
-def spectrogram_name_splitter(spec_name):
-    actor, line, emotion, intensity = spec_name.split('_')
-    intensity = intensity.split('.')[0]
-    extension = intensity.split('.')[-1]
-
-    emotion = get_notation_by_emotion(emotion)
-    intensity = get_notation_by_emotion_level(intensity)
-
-    return actor, line, emotion, intensity, extension
 
 
 def write_pretrained_model_features_for_video(model, start=1001, end=1092):
@@ -379,3 +243,100 @@ def write_pretrained_model_features_for_video(model, start=1001, end=1092):
                 i += 1
 
             video_capture.release()
+
+
+def get_face_cropped_image(img):
+    pil_img = Image.fromarray(img.astype(np.uint8))
+
+    mtcnn = MTCNN()
+
+    # # Get cropped and prewhitened image tensor
+    coord, _ = mtcnn.detect(pil_img)
+    y_tl = int(coord[0][0])  # top left y coordinate
+    x_tl = int(coord[0][1])  # top left x coordinate
+    y_br = int(coord[0][2])  # bottom right y coordinate
+    x_br = int(coord[0][3])  # bottom right x coordinate
+
+    return img[x_tl:x_br, y_tl:y_br, :]
+
+
+def initialize_model(num_classes, feature_extract, use_pretrained=True):
+    model = models.resnet50(pretrained=use_pretrained)
+    set_parameter_requires_grad(model, feature_extract)
+    num_features = model.fc.in_features
+    model.fc = nn.Linear(num_features, num_classes)
+
+    return model
+
+
+def set_parameter_requires_grad(model, feature_extracting):
+    if feature_extracting:
+        for param in model.parameters():
+            param.requires_grad = False
+
+
+def spectrogram_windowing(spectrogram, window_size=70, window_count=5, plot=False):
+    channels, frequencies, timespan = spectrogram.shape
+    windows = torch.empty((window_count, channels, frequencies, window_size))
+    windows_indexes = list()
+
+    if window_count == 1:
+        return [spectrogram[:, :, :window_size]]
+
+    window_overlap = int((window_count * window_size - timespan) / (window_count - 1))
+
+    for i in range(0, window_count - 1):
+        windows[i] = spectrogram[:, :,
+                     i * (window_size - window_overlap): i * (window_size - window_overlap) + window_size]
+
+        windows_indexes.append((i * (window_size - window_overlap), i * (window_size - window_overlap) + window_size))
+
+    windows[window_count - 1] = spectrogram[:, :, timespan - window_size:]
+    windows_indexes.append((timespan - window_size, spectrogram.shape[2]))
+
+    if plot:
+        plt.figure(), plt.subplot(window_count + 1, 1, 1), plt.imshow(torch.permute(spectrogram, (1, 2, 0)))
+        for i in range(0, window_count):
+            plt.subplot(window_count + 1, 1, i + 2), plt.imshow(torch.permute(windows[i], (1, 2, 0)))
+
+        plt.show()
+
+    return windows, windows_indexes
+
+
+def random_spectrogram_windowing(spectrogram, window_size=70, window_count=5, plot=False):
+    channels, frequencies, timespan = spectrogram.shape
+    windows = torch.empty((window_count, channels, frequencies, window_size))
+
+    for i in range(0, window_count):
+        start = np.random.randint(low=0, high=timespan - window_size)
+        end = start + window_size
+        windows[i] = spectrogram[:, :, start:end]
+
+    if plot:
+        plt.figure(), plt.subplot(window_count + 1, 1, 1), plt.imshow(torch.permute(spectrogram, (1, 2, 0)))
+        for i in range(0, window_count):
+            plt.subplot(window_count + 1, 1, i + 2), plt.imshow(torch.permute(windows[i], (1, 2, 0)))
+
+        plt.show()
+
+    return windows
+
+
+def compute_entropy(probabilities):
+    entropies = np.zeros(len(probabilities))
+    for idx in range(len(probabilities)):
+        for probability in probabilities[idx]:
+            entropies[idx] = entropies[idx] - probability * np.log2(probability)
+    return entropies
+
+
+def spectrogram_name_splitter(spec_name):
+    actor, line, emotion, intensity = spec_name.split('_')
+    intensity = intensity.split('.')[0]
+    extension = intensity.split('.')[-1]
+
+    emotion = get_notation_by_emotion(emotion)
+    intensity = get_notation_by_emotion_level(intensity)
+
+    return actor, line, emotion, intensity, extension

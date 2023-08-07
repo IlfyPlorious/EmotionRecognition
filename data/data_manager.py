@@ -3,8 +3,6 @@ import os
 import numpy as np
 import torch
 from torch import load
-from torch import nn
-from torchvision import models
 from torchvision.transforms import Lambda
 
 from data.audio_video_dataset import AudioVideoDataset
@@ -36,7 +34,6 @@ class DataManager:
             self.actor_dirs.append(os.path.join(self.config['spectrogram_dir'], actor))
             self.actor_dirs_count += 1
 
-        self.vid_model = self.initialize_pretrained_video_model()
         self.spec_model = self.initialize_spectrogram_model()
 
     def initialize_spectrogram_model(self, device='cuda'):
@@ -49,29 +46,11 @@ class DataManager:
 
         return model
 
-    def initialize_pretrained_video_model(self, num_classes=6, feature_extract=True, use_pretrained=True,
-                                          device='cuda'):
-        # Initialize these variables which will be set in this if statement. Each of these
-        #   variables is model specific.
-
-        model = models.resnet50(pretrained=use_pretrained).to(device)
-        self.set_parameter_requires_grad(model, feature_extract)
-        num_features = model.fc.in_features
-        model.fc = nn.Linear(num_features, num_classes)
-
-        return model
-
-    @staticmethod
-    def set_parameter_requires_grad(model, feature_extracting=True):
-        if feature_extracting:
-            for param in model.parameters():
-                param.requires_grad = False
-
     def get_dataloader(self):
         dataset = AudioVideoDataset(window_count=3, window_size=120, actor_dirs=self.actor_dirs,
                                     transform=self.transform,
                                     transform_target=self.transform_target, config=self.config,
-                                    spec_model=self.spec_model, vid_model=self.vid_model)
+                                    spec_model=self.spec_model)
 
         dataloader = torch.utils.data.DataLoader(
             dataset,
@@ -103,13 +82,13 @@ class DataManager:
         train_dataset = AudioVideoDataset(window_count=3, window_size=120, actor_dirs=train_dirs,
                                           transform=self.transform,
                                           transform_target=self.transform_target, config=self.config,
-                                          spec_model=self.spec_model, vid_model=self.vid_model)
+                                          spec_model=self.spec_model)
         train_dataset_size = len(train_dataset)
 
         eval_dataset = AudioVideoDataset(window_count=3, window_size=120, actor_dirs=eval_dirs,
                                          transform=self.transform,
                                          transform_target=self.transform_target, config=self.config,
-                                         spec_model=self.spec_model, vid_model=self.vid_model)
+                                         spec_model=self.spec_model)
         eval_dataset_size = len(eval_dataset)
 
         ## INDICES SHUFFLE ##

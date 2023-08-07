@@ -16,6 +16,5 @@
   "final_exp_path": "NetworksData",
   "final_exp_name": "BrainNetwork/Randomized",
   "resume_training": true,
-  "random_windowing": true,
-  "use_entropy": true
+  "random_windowing": true
 }

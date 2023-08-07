@@ -78,3 +78,100 @@ class EmotionsNetworkV3(nn.Module):
         for s in size:
             num_features *= s
         return num_features
+
+
+    def _get_frame_features_random_based(self, spec_path):
+        ## ---------- MANAGE VIDEO FRAME RANDOMLY --------- ##
+
+        actor, line, emotion, intensity, _ = spectrogram_name_splitter(spec_path.split('/')[-1])
+        image_data_dir = self.config['video_data']
+        image_actor_dir = os.path.join(image_data_dir, actor)
+        vid_name = f'{actor}_{line}_{emotion}_{intensity}'
+
+        vids = os.listdir(image_actor_dir)
+        frames = list(filter(lambda actor_vid: vid_name in actor_vid, vids))
+
+        i = 0
+        intensities = ['LO', 'MD', 'HI']
+
+        while len(frames) == 0 and i < 3:
+            vid_name = f'{actor}_{line}_{emotion}_{intensities[i]}'
+            frames = list(filter(lambda actor_vid: vid_name in actor_vid, vids))
+            i += 0
+
+        frame_numbers = list(map(lambda frame: int(frame.split('_')[-1].split('.')[0]), frames))
+        max_frame_number = np.amax(frame_numbers)
+        min_frame_number = np.amin(frame_numbers)
+
+        sorted_frame_numbers = sorted(frames)
+
+        randomizer_1 = np.random.randint(low=min_frame_number, high=max_frame_number - 4)
+        randomizer_2 = np.random.randint(low=min_frame_number, high=max_frame_number - 4)
+        randomizer_3 = np.random.randint(low=min_frame_number, high=max_frame_number - 4)
+
+        start_frame_name = None
+        end_frame_name = None
+        mid_frame_name = None
+
+        try:
+            start_frame_name = [
+                sorted_frame_numbers[randomizer_1],
+                sorted_frame_numbers[randomizer_1 + 1],
+                sorted_frame_numbers[randomizer_1 + 2]
+            ]
+            end_frame_name = [
+                sorted_frame_numbers[randomizer_2],
+                sorted_frame_numbers[randomizer_2 + 1],
+                sorted_frame_numbers[randomizer_2 + 2]
+            ]
+            mid_frame_name = [
+                sorted_frame_numbers[randomizer_3],
+                sorted_frame_numbers[randomizer_3 + 1],
+                sorted_frame_numbers[randomizer_3 + 2]
+            ]
+        except Exception as e:
+            print(e)
+            print(f'Problem with {vid_name}')
+            print(f'Length of sorted_frame_numbers: {len(sorted_frame_numbers)}')
+            print(f'randomizer1: {randomizer_1}')
+            print(f'randomizer2: {randomizer_2}')
+            print(f'randomizer3: {randomizer_3}')
+
+        try:
+            start_stack = []
+            mid_stack = []
+            end_stack = []
+            for frame_name in start_frame_name:
+                frame = torch.tensor(np.load(os.path.join(image_actor_dir, frame_name)))
+                start_stack.append(frame)
+
+            for frame_name in mid_frame_name:
+                frame = torch.tensor(np.load(os.path.join(image_actor_dir, frame_name)))
+                mid_stack.append(frame)
+
+            for frame_name in end_frame_name:
+                frame = torch.tensor(np.load(os.path.join(image_actor_dir, frame_name)))
+                end_stack.append(frame)
+
+            start_stack = torch.stack(start_stack)
+            mid_stack = torch.stack(mid_stack)
+            end_stack = torch.stack(end_stack)
+
+            frame_image_features = torch.cat((
+                start_stack,
+                mid_stack,
+                end_stack
+            ), dim=1)
+
+            frame_image_features = torch.stack([frame_image_features])
+        except Exception as e:
+            print(e)
+            print(f'Problems with {vid_name}')
+            print(f'Frame names for {vid_name}: {start_frame_name}, {mid_frame_name}, {end_frame_name}')
+            print(f'Frames for {vid_name}: {frame_numbers}')
+            print(f'Start index: {start_frame_name}')
+            print(f'Mid index: {mid_frame_name}')
+            print(f'End index: {end_frame_name}')
+            print(f'Spec path {spec_path}')
+
+        return frame_image_features

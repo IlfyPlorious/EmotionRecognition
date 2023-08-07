@@ -5,9 +5,7 @@ import sys
 from datetime import date
 from threading import Thread
 from time import sleep
-import matplotlib.pyplot as plt
 
-from util import ioUtil as iou
 import torch
 
 torch.cuda.empty_cache()
@@ -20,15 +18,13 @@ torch.cuda.empty_cache()
 
 
 class TrainerSpectrogram:
-    def __init__(self, model, train_dataloader, eval_dataloader, criterion, optimizer, scheduler, loss_fn, config):
+    def __init__(self, model, train_dataloader, eval_dataloader, optimizer, scheduler, loss_fn, config):
         self.config = config
         self.model = model
         self.train_dataloader = train_dataloader
         self.eval_dataloader = eval_dataloader
-        self.criterion = criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
-        self.best_metric = 0.0
         self.loss_fn = loss_fn
         self.log_file = open(os.path.join(config['save_file_path'], str(date.today()) + '.txt'), 'a+')
         self.epoch_loss_data = []
@@ -130,21 +126,13 @@ class TrainerSpectrogram:
 
         return 100 * correct, test_loss
 
-    def save_net_state(self, epoch, latest=False, best=False):
+    def save_net_state(self, epoch, latest=False):
         if latest is True:
             path_to_save = os.path.join(self.config['exp_path'], self.config['exp_name_spec'], f'latest_checkpoint.pkl')
             to_save = {
                 'epoch': epoch,
                 'model_weights': self.model.state_dict(),
                 'optimizer': self.optimizer.state_dict()
-            }
-            torch.save(to_save, path_to_save)
-        elif best is True:
-            path_to_save = os.path.join(self.config['exp_path'], self.config['exp_name_spec'], f'best_model.pkl')
-            to_save = {
-                'epoch': epoch,
-                'stats': self.best_metric,
-                'model_weights': self.model.state_dict()
             }
             torch.save(to_save, path_to_save)
         else:
