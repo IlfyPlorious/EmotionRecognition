@@ -2,8 +2,8 @@ import numpy as np
 import torch
 
 from torchvision.transforms import Lambda
-from data.base_dataset import SpectrogramsDataset
-from data.base_dataset import VideosDataset
+from data.spec_dataset import SpectrogramsDataset
+from data.spec_dataset import VideosDataset
 from util import ioUtil
 
 
